@@ -1,20 +1,19 @@
 ﻿import requests, re, json, time, xmlx
-import mwparserfromhell as mw
+import mwparserfromhell as mw, easygui as e
 
 #setup
 s = requests.session() #start a new session
-info = open('login.txt') #open login info
-username = info.readline().strip() #username on first line
-password = info.readline().strip() #password on second line
-api = info.readline().strip() #api url on third line
-info.close() #close the file
+with open('login.txt') as info: #open login info
+    username = info.readline().strip() #username on first line
+    password = info.readline().strip() #password on second line
+    api = info.readline().strip() #api url on third line
 #get configuration
 r = json.loads(s.get(api, params={'action':'query','prop':'revisions','rvprop':'comment','rvlimit':'1','titles':'User:%s/Config/TemplatesWithDateParams' % username,'format':'json'}).text) #get list of templates with date parameters
-templates = r['query']['pages'][r['query']['pages'].keys()[0]]['revisions'][0]['comment'] #get the comment of the last revision - the list is stored there
+templates = r['query']['pages'].values()[0]['revisions'][0]['comment'] #get the comment of the last revision - the list is stored there
 r = json.loads(s.get(api, params={'action':'query','prop':'revisions','rvprop':'comment','rvlimit':'1','titles':'User:%s/Config/InaccurateCnCount' % username,'format':'json'}).text) #get number of {{cn}}s for inaccurate template
-cncount = int(r['query']['pages'][r['query']['pages'].keys()[0]]['revisions'][0]['comment']) #get the comment of the last revision - the number is stored there
+cncount = int(r['query']['pages'].values()[0]['revisions'][0]['comment']) #get the comment of the last revision - the number is stored there
 r = json.loads(s.get(api, params={'action':'query','prop':'revisions','rvprop':'content','rvlimit':'1','titles':'User:%s/Config/FirstAndSecondPersonWords' % username,'format':'json'}).text) #get first and second person words
-words = re.search('<pre>(.*)</pre>', r['query']['pages'][r['query']['pages'].keys()[0]]['revisions'][0]['*'], re.S).group(0).strip().replace('\n', '|')
+words = re.search('<pre>(.*)</pre>', r['query']['pages'].values()[0]['revisions'][0]['*'], re.S).group(0).strip().replace('\n', '|')
 
 #login
 r = json.loads(s.post(api, params={'action':'login','lgname':username,'format':'json'}).text) #request login token through action=login
@@ -29,18 +28,28 @@ def submitedit(title, content, summary): #submit edit function
     token = r['tokens']['edittoken'] #get token from result
     r = json.loads(s.post(api, data={'action':'edit','title':title,'text':content,'summary':summary,'token':token,'bot':'true','format':'json'}).text) #long post request for edit
     return r['edit']['result'] #return edit result
-import easygui as e
-for page in ['User:Kenny2scratch/Sandbox 2']:
-    r = json.loads(s.get(api, params={'action':'query','prop':'revisions','titles':page,'rvprop':'content','format':'json'}).text) #get page
-    content = r['query']['pages'][r['query']['pages'].keys()[0]]['revisions'][0]['*'] #get page content
-    exp = re.compile(r'(\s)(' + words + r')((?=[ -~])\W)', re.I)
-    if re.search(exp, content):
-        content = re.sub(exp, r'\1!\2!\3', content)
-        content = e.textbox('Modify content below - first and second person are highlighted in !s', 'Modify Content', content, 1).strip()
-        content = re.sub(r'!([^!\s]+?)!', r'\1', content)
-        if len(content): print 'Edit on page ' + page + ': ' + submitedit(page, content, 'Semi-automated edit: de-1st/2nd-personified.')
+if raw_input('Press Enter to skip de-personifying, or any key (then Enter) to do it: '):
+    limit = int(raw_input('Enter number of pages: '))
+    pages = []
+    contin = ''
+    while limit > 0:
+        r = json.loads(s.get(api, params={'action':'query','list':'random','rnlimit':str(limit % 20 if limit > 20 else limit),'rnnamespace':'0','format':'json'}).text) #get list of random pages
+        limit -= 20
+        r = r['query']['random']
+        pages += [p['title'] for p in r]
+    for page in pages:
+        r = json.loads(s.get(api, params={'action':'query','prop':'revisions','titles':page,'rvprop':'content','format':'json'}).text) #get page
+        content = r['query']['pages'][r['query']['pages'].keys()[0]]['revisions'][0]['*'] #get page content
+        exp = re.compile(r'(\s|(?=[ -~])\W)(?=[a-zA-Z\']+)(' + words + r')((?=[ -~])\W)', re.I)
+        if re.search(exp, content):
+            content = re.sub(exp, ur'\1\u2588\2\u2588\3', content)
+            content = e.codebox(u'Modify content below - first and second person are highlighted in \u2588s. Press Cancel to cancel.', 'Modify Content of ' + page, content)
+            if not content is None:
+                content = content.strip()
+                content = re.sub(ur'\u2588([^!\s]+?)\u2588', r'\1', content)
+                print 'Edit on page ' + page + ': ' + submitedit(page, content, 'Semi-automated edit: de-1st/2nd-personified.')
 
-raise SystemExit #uncomment this to stop here
+#raise SystemExit #uncomment this to stop here
 
 def gd(page, template): #get date from diffs function
     '  Getting date'
