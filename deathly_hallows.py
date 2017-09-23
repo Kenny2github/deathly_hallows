@@ -40,7 +40,7 @@ for page in ['User:Kenny2scratch/Sandbox 2']:
         content = re.sub(r'!([^!\s]+?)!', r'\1', content)
         if len(content): print 'Edit on page ' + page + ': ' + submitedit(page, content, 'Semi-automated edit: de-1st/2nd-personified.')
 
-raise SystemExit #uncomment this to continue
+raise SystemExit #uncomment this to stop here
 
 def gd(page, template): #get date from diffs function
     '  Getting date'
@@ -101,7 +101,9 @@ for page in cms: #for every title
     else:
         print "Page", page, "was not edited."
     time.sleep(1)
-#raise SystemExit #uncomment this to disable inaccuracy check
+
+#raise SystemExit #uncomment this to stop here
+
 r = json.loads(s.get(api, params={'action':'query','list':'embeddedin','eititle':'Template:Citation needed','eilimit':'max','format':'json'}).text) #get embeddedins for citation needed
 r = r['query']['embeddedin'] #narrow down to list
 eis = [] #empty list for now
