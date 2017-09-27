@@ -28,8 +28,9 @@ def submitedit(title, content, summary): #submit edit function
     token = r['tokens']['edittoken'] #get token from result
     r = json.loads(s.post(api, data={'action':'edit','title':title,'text':content,'summary':summary,'token':token,'bot':'true','format':'json'}).text) #long post request for edit
     return r['edit']['result'] #return edit result
-if raw_input('Press Enter to skip de-personifying, or any key (then Enter) to do it: '):
-    limit = int(raw_input('Enter number of pages: '))
+
+limit = int(raw_input('Press Enter to skip de-personifying, or a number (then Enter) to do it on that amount of pages: ') or '0')
+if limit:
     pages = []
     contin = ''
     while limit > 0:
@@ -48,6 +49,8 @@ if raw_input('Press Enter to skip de-personifying, or any key (then Enter) to do
                 content = content.strip()
                 content = re.sub(ur'\u2588([^!\s]+?)\u2588', r'\1', content)
                 print 'Edit on page ' + page + ': ' + submitedit(page, content, 'Semi-automated edit: de-1st/2nd-personified.')
+else:
+    del limit
 
 #raise SystemExit #uncomment this to stop here
 
