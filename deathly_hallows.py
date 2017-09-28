@@ -115,7 +115,7 @@ for page in cms: #for every title
     time.sleep(1)
 
 #raise SystemExit #uncomment this to stop here
-import cPickle as pickle
+import cPickle as pickle, sys
 try:
     cache = pickle.load('inaccuratecache.pickle')
 except IOError:
