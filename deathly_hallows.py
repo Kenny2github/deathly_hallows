@@ -115,6 +115,11 @@ for page in cms: #for every title
     time.sleep(1)
 
 #raise SystemExit #uncomment this to stop here
+import cPickle as pickle
+try:
+    cache = pickle.load('inaccuratecache.pickle')
+except IOError:
+    cache = []
 
 r = json.loads(s.get(api, params={'action':'query','list':'embeddedin','eititle':'Template:Citation needed','eilimit':'max','format':'json'}).text) #get embeddedins for citation needed
 r = r['query']['embeddedin'] #narrow down to list
@@ -126,24 +131,28 @@ r = r['query']['embeddedin'] #narrow down to list
 for ei in r: #for every extra embeddedin
     eis.append(ei['title']) #add it too
 for page in eis: #for every page in embeddedins
-    print 'Page', page
-    r = json.loads(s.get(api, params={'action':'query','prop':'revisions','rvprop':'content','titles':page,'rvlimit':'1','format':'json'}).text) #get content of page
-    if r['query']['pages'][r['query']['pages'].keys()[0]]['ns'] in [2,3]: #if this page is in userspace
-        print ' In userspace, skipping.'
-        continue #skip the entire page
-    content = r['query']['pages'][r['query']['pages'].keys()[0]]['revisions'][0]['*'] #get page content
-    if re.search('{{NoBots}}', content, flags=re.S|re.I): #if there's a {{NoBots}} tag
-        print ' {{NoBots}} in page, skipping.'
-        continue #skip it too
-    summary = 'Automated edit:' #first part of summary
-    #all pages with dateless templates have had their dates added now
-    detected = len(re.findall('{{(cn|citation needed)}}', content))
-    if detected > cncount and not re.search('{{inaccurate[^{}]*?}}', content, flags=re.S|re.I): #if over cncount cns and {{inaccurate}} hasn't already been added
-        content = '{{inaccurate|date={{subst:CURRENTMONTHNAME}} {{subst:CURRENTYEAR}}}}' + content #add inaccurate template to top (with date)
-        summary += ' added {{inaccurate}} (' + str(detected) + ' {{citation needed}}s);' #add to summary
-        print ' ' + str(detected) + ' {{citation neeeded}}s'
-    if summary != 'Automated edit:': #if something happened
-        print "Edit on page", page, "with summary '" + summary + "':", submitedit(page, content, summary[:-1]) #submit the edit
+    if page in cache and not '--nocache' in sys.argv: continue
     else:
-        print "Page", page, "was not edited."
-    time.sleep(5)
+        print 'Page', page
+        cache.append(page)
+        r = json.loads(s.get(api, params={'action':'query','prop':'revisions','rvprop':'content','titles':page,'rvlimit':'1','format':'json'}).text) #get content of page
+        if r['query']['pages'][r['query']['pages'].keys()[0]]['ns'] in [2,3]: #if this page is in userspace
+            print ' In userspace, skipping.'
+            continue #skip the entire page
+        content = r['query']['pages'][r['query']['pages'].keys()[0]]['revisions'][0]['*'] #get page content
+        if re.search('{{NoBots}}', content, flags=re.S|re.I): #if there's a {{NoBots}} tag
+            print ' {{NoBots}} in page, skipping.'
+            continue #skip it too
+        summary = 'Automated edit:' #first part of summary
+        #all pages with dateless templates have had their dates added now
+        detected = len(re.findall('{{(cn|citation needed)}}', content))
+        if detected > cncount and not re.search('{{inaccurate[^{}]*?}}', content, flags=re.S|re.I): #if over cncount cns and {{inaccurate}} hasn't already been added
+            content = '{{inaccurate|date={{subst:CURRENTMONTHNAME}} {{subst:CURRENTYEAR}}}}' + content #add inaccurate template to top (with date)
+            summary += ' added {{inaccurate}} (' + str(detected) + ' {{citation needed}}s);' #add to summary
+            print ' ' + str(detected) + ' {{citation neeeded}}s'
+        if summary != 'Automated edit:': #if something happened
+            print "Edit on page", page, "with summary '" + summary + "':", submitedit(page, content, summary[:-1]) #submit the edit
+        else:
+            print "Page", page, "was not edited."
+        time.sleep(5)
+pickle.dump(cache, 'inaccuratecache.pickle', -1)
