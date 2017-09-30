@@ -156,4 +156,5 @@ try:
             else:
                 print "Page", page, "was not edited."
             time.sleep(5)
-finally: with open('inaccuratecache.pickle', 'w') as f: pickle.dump(cache, f, -1)
+finally:
+    with open('inaccuratecache.pickle', 'w') as f: pickle.dump(cache, f, -1)
