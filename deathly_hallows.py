@@ -117,7 +117,7 @@ for page in cms: #for every title
 #raise SystemExit #uncomment this to stop here
 import cPickle as pickle, sys
 try:
-    with open('inaccuratecache.pickle', 'r') as f: cache = pickle.load(f)
+    with open('inaccuratecache.pickle', 'rb') as f: cache = pickle.load(f)
 except IOError:
     cache = []
 
@@ -132,7 +132,7 @@ for ei in r: #for every extra embeddedin
     eis.append(ei['title']) #add it too
 try:
     for page in eis: #for every page in embeddedins
-        if page in cache and not '--nocache' in sys.argv: continue
+        if page in cache and not '--nocache' in sys.argv: print page, "already in cache, skipping"; continue
         else:
             print 'Page', page
             cache.append(page)
@@ -154,7 +154,9 @@ try:
             if summary != 'Automated edit:': #if something happened
                 print "Edit on page", page, "with summary '" + summary + "':", submitedit(page, content, summary[:-1]) #submit the edit
             else:
+                if not detected > cncount: print " Not enough {{citation needed}}s"
+                else: print " {{inaccurate}} already on page"
                 print "Page", page, "was not edited."
             time.sleep(5)
 finally:
-    with open('inaccuratecache.pickle', 'w') as f: pickle.dump(cache, f, -1)
+    with open('inaccuratecache.pickle', 'wb') as f: pickle.dump(cache, f, -1)
