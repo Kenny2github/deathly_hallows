@@ -136,8 +136,8 @@ for page in cms: #for every title
         print ' {{NoBots}} in page, skipping.'
         continue #skip the entire page
     summary = 'Automated edit:' #first part of summary
-    if re.search(r'{{((?:%s)(?![^{}]*?\|date=)[^{}]*?)}}' % templates, content, flags=re.S|re.I): #if there are templates without dates
-        content = re.sub(r'{{((?P<template>%s)(?![^{}]*?\|date=)[^{}]*?)}}' % templates, repl, content, flags=re.S|re.I) #add the dates
+    if re.search(r'{{((?:%s)(?![^{}]*?\|date=)(?:\|??[^{}]*?))}}' % templates, content, flags=re.S|re.I): #if there are templates without dates
+        content = re.sub(r'{{((?P<template>%s)(?![^{}]*?\|date=)(?:\|??[^{}]*?))}}' % templates, repl, content, flags=re.S|re.I) #add the dates
         summary += ' added date to templates;' #add to summary
     if len(re.findall('{{(cn|citation needed)}}', content)) > cncount and not re.search('{{inaccurate[^{}]*?}}', content, flags=re.S|re.I): #if over cncount cns and {{inaccurate}} hasn't already been added
         content = '{{inaccurate|date={{subst:CURRENTMONTHNAME}} {{subst:CURRENTYEAR}}}}' + content #add inaccurate template to top (with date)
