@@ -108,6 +108,8 @@ The process is:
                 if re.search(r'(?:{{((?:%s)(?![^{}]*?\|date=)[^{}]*?)}})|(?:{{[^{}]*?<([^<>/]*?)[^<>/]*?>%s</\2>[^{}]*?}})' % (template, template), tag.content, re.S|re.I): #check if there was 
                     date = time.strptime(diff['timestamp'], '%Y-%m-%dT%H:%M:%SZ') #get date if it was
                     break #we’ve found the date, get outta here
+        if date is not None:
+            break
         except KeyError: #workaround for hidden revisions - diff['diff']['*'] will raise a KeyError if the diff is missing
             continue #skip the hidden revision
     if not date: #if date is still none
