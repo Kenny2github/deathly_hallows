@@ -1,4 +1,4 @@
-﻿import requests, re, json, time, xmlx
+import requests, re, json, time, xmlx
 import mwparserfromhell as mw, easygui as e
 
 #setup
@@ -43,7 +43,6 @@ It asks for user input as to how many pages to depersonify, and, if the input is
 limit = int(raw_input('Press Enter to skip de-personifying, or a number (then Enter) to do it on that amount of pages: ') or '0') #limit is int(input) or 0
 if limit: #if limit != 0
     pages = [] #no pages yet
-    contin = '' #continue
     while limit > 0: #while we still have pages left to get
         r = json.loads(s.get(api, params={'action':'query','list':'random','rnlimit':str(limit % 20 if limit > 20 else limit),'rnnamespace':'0','format':'json'}).text) #get list of random pages
         limit -= 20 #limit -= 20
@@ -51,14 +50,46 @@ if limit: #if limit != 0
         pages += [p['title'] for p in r] #titles, not page dicts
     for page in pages: #for every page
         r = json.loads(s.get(api, params={'action':'query','prop':'revisions','titles':page,'rvprop':'content','format':'json'}).text) #get page
-        content = r['query']['pages'][r['query']['pages'].keys()[0]]['revisions'][0]['*'] #get page content
+        content = r['query']['pages'].values()[0]['revisions'][0]['*'] #get page content
         exp = re.compile(r'(\s|(?=[ -~])\W)(?=[a-zA-Z\']+)(' + words + r')((?=[ -~])\W)', re.I) #compile expression for quick use
         if re.search(exp, content): #if there's a match
             content = re.sub(exp, ur'\1\u2588\2\u2588\3', content) #highlight every instance
-            content = e.codebox(u'Modify content below - first and second person are highlighted in \u2588s. Press Cancel to cancel.', 'Modify Content of ' + page, content).strip() or None #pop up box, and get result, make it None if it's empty
+            content = e.codebox(u'Modify content below - first and second person are highlighted in \u2588s. Press Cancel or leave blank to cancel.', 'Modify Content of ' + page, content).strip() or None #pop up box, and get result, make it None if it's empty
             if content is not None: #if it's not None
                 content = re.sub(ur'\u2588([^\u2588\s]+?)\u2588', r'\1', content) #remove all highlights
                 print 'Edit on page ' + page + ': ' + submitedit(page, content, 'Semi-automated edit: de-1st/2nd-personified.') #submit the edit
+
+#raise SystemExit #uncomment this to stop here
+
+"""
+This section is the reference updating section.
+It asks for user input as to how many pages to depersonify, and, if the input is a non-zero number:
+1. gets a list of random pages with length equal to input,
+2. for every page:
+    1. makes sure that it has a <references/> tag, meaning that there are references,. If it doesn't, it stops here. If it does,
+    2. highlights each instance with unicode FULL BLOCK (U+0x2588) characters,
+    3. pops up a dialog box with the highlighted content, and waits for the user to finish editing,
+    4. makes sure that the content is not None or empty. If it is, it skips the edit (all of the references might have not needed to follow the format). Otherwise,
+    5. submits the edit.
+"""
+
+limit = int(raw_input('Press Enter to skip reference updating, or a number (then Enter) to do it on that amount of pages: ') or '0') #limit is int(input) or 0
+if limit: #if limit != 0
+    pages = [] #no pages yet
+    while limit > 0: #while we still have pages left to get
+        r = json.loads(s.get(api, params={'action':'query','list':'random','rnlimit':str(limit % 20 if limit > 20 else limit),'rnnamespace':'0','format':'json'}).text) #get list of random pages
+        limit -= 20 #limit -= 20
+        r = r['query']['random'] #narrow down to list
+        pages += [p['title'] for p in r] #titles, not page dicts
+    for page in pages: #for every page
+        r = json.loads(s.get(api, params={'action':'query','prop':'revisions','titles':page,'rvprop':'content','format':'json'}).text) #get page
+        content = r['query']['pages'].values()[0]['revisions'][0]['*'] #get page content
+        if re.search('<references */>', content, re.I): #if we have a <references/> tag - that means we have references!
+            content = re.sub(r'((?!<ref>[-a-zA-Z0-9_]+?\*?\. \([0-9]{1,2}/[0-9]{1,2}/[0-9]{1,4}\)\. \".*?\" https?://[-a-zA-Z0-9.:]+?(?:/[^/]*?)*?</ref>)(?:<ref>.*?</ref>))',ur'\u2588\1\u2588', content) #monster regex to highlight every instance
+            content = e.codebox(u'Modify content below - bad references are highlighted in \u2588s. Press Cancel or leave blank to cancel.', 'Modify Content of ' + page, content).strip() or None #pop up box, and get result, make it None if it's empty
+            if content is not None: #if it's not None
+                content = re.sub(ur'\u2588([^\u2588]*?)\u2588', r'\1', content, re.S) #remove all highlights
+                print 'Edit on page ' + page + ': ' + submitedit(page, content, 'Semi-automated edit: updated references to follow format.') #submit the edit
 else:
     del limit #otherwise just delete limit
 
@@ -89,12 +120,12 @@ The process is:
 3. Get the month name and year, and return that."""
     print '  Getting date' #log getting date
     r = json.loads(s.get(api, params={'action':'query','prop':'revisions','titles':page,'rvlimit':'max','format':'json'}).text) #get all (or amap) revisions on that page
-    rvs = r['query']['pages'][r['query']['pages'].keys()[0]]['revisions'] #narrow down to list of revisions
+    rvs = r['query']['pages'].values()[0]['revisions'] #narrow down to list of revisions
     date = None #date is none for now
     for rev in rvs: #for every revision
         print '   Revision ID', rev['revid'] #log revision id
-        r = json.loads(s.get(api, params={'action':'query','prop':'revisions','titles':page,'rvstartid':rev['revid'],'rvendid':rev['revid'],'rvdiffto':'prev','format':'json'}).text) #get diff to prev using this rev’s revid
-        diff = r['query']['pages'][r['query']['pages'].keys()[0]]['revisions'][0] #narrow down to revision
+        r = json.loads(s.get(api, params={'action':'query','prop':'revisions','titles':page,'rvstartid':rev['revid'],'rvendid':rev['revid'],'rvdiffto':'prev','format':'json'}).text) #get diff to prev using this rev's revid
+        diff = r['query']['pages'].values()[0]['revisions'][0] #narrow down to revision
         try:
             difftags = mw.parse(diff['diff']['*']).filter_tags() #filter tags for better processing
             tags = [] #blank for now
@@ -107,9 +138,9 @@ The process is:
             for tag in tags: #for every remaining tag
                 if re.search(r'(?:{{((?:%s)(?![^{}]*?\|date=)[^{}]*?)}})|(?:{{[^{}]*?<([^<>/]*?)[^<>/]*?>%s</\2>[^{}]*?}})' % (template, template), tag.content, re.S|re.I): #check if there was 
                     date = time.strptime(diff['timestamp'], '%Y-%m-%dT%H:%M:%SZ') #get date if it was
-                    break #we’ve found the date, get outta here
-        if date is not None:
-            break
+                    break #we've found the date, get outta here
+            if date is not None:
+                break
         except KeyError: #workaround for hidden revisions - diff['diff']['*'] will raise a KeyError if the diff is missing
             continue #skip the hidden revision
     if not date: #if date is still none
@@ -133,7 +164,7 @@ for cm in r: #for every member
 for page in cms: #for every title
     print 'Page', page #log which page
     r = json.loads(s.get(api, params={'action':'query','prop':'revisions','rvprop':'content','titles':page,'rvlimit':'1','format':'json'}).text) #get content of page
-    content = r['query']['pages'][r['query']['pages'].keys()[0]]['revisions'][0]['*'] #get page content
+    content = r['query']['pages'].values()[0]['revisions'][0]['*'] #get page content
     if re.search('{{NoBots}}', content, flags=re.S|re.I): #if there's a {{NoBots}} tag
         print ' {{NoBots}} in page, skipping.'
         continue #skip the entire page
@@ -192,10 +223,10 @@ try:
                 print 'Page', page #log which page we're working on
                 cache.append(page) #add the page to cache
                 r = json.loads(s.get(api, params={'action':'query','prop':'revisions','rvprop':'content','titles':page,'rvlimit':'1','format':'json'}).text) #get content of page
-                if r['query']['pages'][r['query']['pages'].keys()[0]]['ns'] in [2,3]: #if this page is in userspace
+                if r['query']['pages'].values()[0]['ns'] in [2,3]: #if this page is in userspace
                     print ' In userspace, skipping.'
                     continue #skip the entire page
-                content = r['query']['pages'][r['query']['pages'].keys()[0]]['revisions'][0]['*'] #get page content
+                content = r['query']['pages'].values()[0]['revisions'][0]['*'] #get page content
                 if re.search('{{NoBots}}', content, flags=re.S|re.I): #if there's a {{NoBots}} tag
                     print ' {{NoBots}} in page, skipping.'
                     continue #skip it too
