@@ -14,6 +14,8 @@ r = json.loads(s.get(api, params={'action':'query','prop':'revisions','rvprop':'
 cncount = int(r['query']['pages'].values()[0]['revisions'][0]['comment']) #get the comment of the last revision - the number is stored there
 r = json.loads(s.get(api, params={'action':'query','prop':'revisions','rvprop':'content','rvlimit':'1','titles':'User:%s/Config/FirstAndSecondPersonWords' % username,'format':'json'}).text) #get first and second person words
 words = re.search('<pre>(.*)</pre>', r['query']['pages'].values()[0]['revisions'][0]['*'], re.S).group(0).strip().replace('\n', '|') #find the <pre> tag
+r = json.loads(s.get(api, params={'action':'query','prop':'revisions','rvprop':'comment','rvlimit':'1','titles':'User:%s/Config/ReferenceFormat' % username,'format':'json'}).text) #get reference format
+refformat = r['query']['pages'].values()[0]['revisions'][0]['comment'] #get the comment of the last revision - the format is stored there
 
 #login
 r = json.loads(s.post(api, params={'action':'login','lgname':username,'format':'json'}).text) #request login token through action=login
@@ -85,7 +87,7 @@ if limit: #if limit != 0
         r = json.loads(s.get(api, params={'action':'query','prop':'revisions','titles':page,'rvprop':'content','format':'json'}).text) #get page
         content = r['query']['pages'].values()[0]['revisions'][0]['*'] #get page content
         if re.search('<references */>', content, re.I): #if we have a <references/> tag - that means we have references!
-            content = re.sub(r'((?!<ref>[-a-zA-Z0-9_]+?\*?\. \([0-9]{1,2}/[0-9]{1,2}/[0-9]{1,4}\)\. \".*?\" https?://[-a-zA-Z0-9.:]+?(?:/[^/]*?)*?</ref>)(?:<ref>.*?</ref>))',ur'\u2588\1\u2588', content) #monster regex to highlight every instance
+            content = re.sub(r'((?!<ref>%s</ref>)(?:<ref>.*?</ref>))' % refformat,ur'\u2588\1\u2588', content) #monster regex to highlight every instance
             content = e.codebox(u'Modify content below - bad references are highlighted in \u2588s. Press Cancel or leave blank to cancel.', 'Modify Content of ' + page, content).strip() or None #pop up box, and get result, make it None if it's empty
             if content is not None: #if it's not None
                 content = re.sub(ur'\u2588([^\u2588]*?)\u2588', r'\1', content, re.S) #remove all highlights
