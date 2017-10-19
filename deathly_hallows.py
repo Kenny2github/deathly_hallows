@@ -56,7 +56,9 @@ if limit: #if limit != 0
         exp = re.compile(r'(\s|(?=[ -~])\W)(?=[a-zA-Z\']+)(' + words + r')((?=[ -~])\W)', re.I) #compile expression for quick use
         if re.search(exp, content): #if there's a match
             content = re.sub(exp, ur'\1\u2588\2\u2588\3', content) #highlight every instance
-            content = e.codebox(u'Modify content below - first and second person are highlighted in \u2588s. Press Cancel or leave blank to cancel.', 'Modify Content of ' + page, content).strip() or None #pop up box, and get result, make it None if it's empty
+            try: content = e.codebox(u'Modify content below - first and second person are highlighted in \u2588s. Press Cancel or leave blank to cancel.', 'Modify Content of ' + page, content).strip() #pop up box, let them make edits
+            except AttributeError: content = None
+            if len(content) < 1: content = None
             if content is not None: #if it's not None
                 content = re.sub(ur'\u2588([^\u2588\s]+?)\u2588', r'\1', content) #remove all highlights
                 print 'Edit on page ' + page + ': ' + submitedit(page, content, 'Semi-automated edit: de-1st/2nd-personified.') #submit the edit
