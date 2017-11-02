@@ -10,6 +10,8 @@ with open('login.txt') as info: #open login info
 #get configuration
 r = json.loads(s.get(api, params={'action':'query','prop':'revisions','rvprop':'comment','rvlimit':'1','titles':'User:%s/Config/TemplatesWithDateParams' % username,'format':'json'}).text) #get list of templates with date parameters
 templates = r['query']['pages'].values()[0]['revisions'][0]['comment'] #get the comment of the last revision - the list is stored there
+r = json.loads(s.get(api, params={'action':'query','prop':'revisions','rvprop':'comment','rvlimit':'1','titles':'User:%s/Config/TemplateDateFormat' % username,'format':'json'}).text) #get format for dates in templates
+dateformat = r['query']['pages'].values()[0]['revisions'][0]['comment'] #get the comment of the last revision - the format is stored there
 r = json.loads(s.get(api, params={'action':'query','prop':'revisions','rvprop':'comment','rvlimit':'1','titles':'User:%s/Config/InaccurateCnCount' % username,'format':'json'}).text) #get number of {{cn}}s for inaccurate template
 cncount = int(r['query']['pages'].values()[0]['revisions'][0]['comment']) #get the comment of the last revision - the number is stored there
 r = json.loads(s.get(api, params={'action':'query','prop':'revisions','rvprop':'content','rvlimit':'1','titles':'User:%s/Config/FirstAndSecondPersonWords' % username,'format':'json'}).text) #get first and second person words
@@ -140,11 +142,11 @@ The process is:
             for tag in tags:
                 i.removechildren(lambda e:e.name == 'del') #remove del tags from all children
             for tag in tags: #for every remaining tag
-                if re.search(r'(?:{{((?:%s)(?![^{}]*?\|date=)[^{}]*?)}})|(?:{{[^{}]*?<([^<>/]*?)[^<>/]*?>%s</\2>[^{}]*?}})' % (template, template), tag.content, re.S|re.I): #check if there was 
+                if re.search(r'(?:{{((?:%s)(?![^{}]*?\|date=%s)[^{}]*?)}})|(?:{{[^{}]*?<([^<>/]*?)[^<>/]*?>%s</\2>[^{}]*?}})' % (template, dateformat, template), tag.content, re.S|re.I): #check if there was 
                     date = time.strptime(diff['timestamp'], '%Y-%m-%dT%H:%M:%SZ') #get date if it was
                     break #we've found the date, get outta here
-            if date is not None:
-                break
+            if date is not None: #we've found the date
+                break #get outta here
         except KeyError: #workaround for hidden revisions - diff['diff']['*'] will raise a KeyError if the diff is missing
             continue #skip the hidden revision
     if not date: #if date is still none
@@ -173,8 +175,8 @@ for page in cms: #for every title
         print ' {{NoBots}} in page, skipping.'
         continue #skip the entire page
     summary = 'Automated edit:' #first part of summary
-    if re.search(r'{{((?:%s)(?![^{}]*?\|date=)(?:\|??[^{}]*?))}}' % templates, content, flags=re.S|re.I): #if there are templates without dates
-        content = re.sub(r'{{((?P<template>%s)(?![^{}]*?\|date=)(?:\|??[^{}]*?))}}' % templates, repl, content, flags=re.S|re.I) #add the dates
+    if re.search(r'{{((?:%s)(?![^{}]*?\|date=%s)(?:\|??[^{}]*?))}}' % (templates, dateformat), content, flags=re.S|re.I): #if there are templates without dates
+        content = re.sub(r'{{((?P<template>%s)(?![^{}]*?\|date=%s)(?:\|??[^{}]*?))}}' % (templates, dateformat), repl, content, flags=re.S|re.I) #add the dates
         summary += ' added date to templates;' #add to summary
     if len(re.findall('{{(cn|citation needed)}}', content)) > cncount and not re.search('{{inaccurate[^{}]*?}}', content, flags=re.S|re.I): #if over cncount cns and {{inaccurate}} hasn't already been added
         content = '{{inaccurate|date={{subst:CURRENTMONTHNAME}} {{subst:CURRENTYEAR}}}}' + content #add inaccurate template to top (with date)
