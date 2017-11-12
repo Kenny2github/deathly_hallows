@@ -18,6 +18,12 @@ r = json.loads(s.get(api, params={'action':'query','prop':'revisions','rvprop':'
 words = re.search('<pre>(.*)</pre>', r['query']['pages'].values()[0]['revisions'][0]['*'], re.S).group(0).strip().replace('\n', '|') #find the <pre> tag
 r = json.loads(s.get(api, params={'action':'query','prop':'revisions','rvprop':'comment','rvlimit':'1','titles':'User:%s/Config/ReferenceFormat' % username,'format':'json'}).text) #get reference format
 refformat = r['query']['pages'].values()[0]['revisions'][0]['comment'] #get the comment of the last revision - the format is stored there
+r = json.loads(s.get(api, params={'action':'query','prop':'revisions','rvprop':'content','rvlimit':'1','titles':'Project:Style Guide','format':'json'}).text) #get the project style guide
+r = r['query']['pages'].values()[0]['revisions'][0]['*']
+r = re.search(r'<!--\nbots::[\s\S]*-->', r).group(0)
+styles = {}
+for match in re.finditer(r'(?P<key>[-a-zA-Z]+): (?P<negate>!?)%(?P<value>.*?)%', r):
+    styles[match.group('key')] = {'*': match.group('value'), 'negate': match.group('negate')}
 
 #login
 r = json.loads(s.post(api, params={'action':'login','lgname':username,'format':'json'}).text) #request login token through action=login
@@ -171,7 +177,7 @@ for page in cms: #for every title
     print 'Page', page #log which page
     r = json.loads(s.get(api, params={'action':'query','prop':'revisions','rvprop':'content','titles':page,'rvlimit':'1','format':'json'}).text) #get content of page
     content = r['query']['pages'].values()[0]['revisions'][0]['*'] #get page content
-    if re.search('{{NoBots}}', content, flags=re.S|re.I): #if there's a {{NoBots}} tag
+    if re.search('{{NoBots.*?}}', content, flags=re.S|re.I): #if there's a {{NoBots}} tag
         print ' {{NoBots}} in page, skipping.'
         continue #skip the entire page
     summary = 'Automated edit:' #first part of summary
@@ -188,6 +194,36 @@ for page in cms: #for every title
     time.sleep(1) #sleep 1
 
 #raise SystemExit #uncomment this to stop here
+
+limit = 10 #yes, it's hardcoded
+r = json.loads(s.get(api, params={'action':'query','list':'random','rnlimit':limit,'rnnamespace':'0','format':'json'}).text)
+pages = ['User:Kenny2scratch/Sandbox 2']#[p['title'] for p in r['query']['random']]
+for page in pages:
+    print 'Page', page
+    r = json.loads(s.get(api, params={'action':'query','prop':'revisions','rvlimit':'1','rvprop':'content','titles':page,'format':'json'}).text)
+    content = r['query']['pages'].values()[0]['revisions'][0]['*']
+    if not re.search('(?:{{bad style.*?}}|{{NoBots.*?}})', content, re.S|re.I):
+        bads = []
+        for k, v in styles.items():
+            match = (not re.search(v['*'], content) if v['negate'] else re.search(v['*'], content))
+            if match:
+                print ' Found flaw:', k
+                bads.append(k)
+        if bads:
+            insert = '{{bad style\n|' + '\n|'.join(bads) + '\n|date={{subst:CURRENTMONTHNAME}} {{subst:CURRENTYEAR}}\n}}'
+            content = re.sub(r'(?P<pre>[\s\S]*)(?P<cats>(?:\[\[[^]]\]\]\n?)*)\n*$', r'\g<pre>' + insert + r'\g<cats>', content)
+            print 'Edit on page', page + ':', submitedit(
+                page,
+                content,
+                'Automated edit: added {template} ({count} guidelines broken)'.format(
+                    template='{{[[Template:Bad style|bad style]]}}',
+                    count=len(bads)
+                )
+            )
+    else:
+        print ' {{NoBots}} or {{bad style}} in page, skipping.'
+
+raise SystemExit #uncomment this to stop here
 
 """This section is the adding {{inaccurate}} section.
 The process is:
@@ -233,7 +269,7 @@ try:
                     print ' In userspace, skipping.'
                     continue #skip the entire page
                 content = r['query']['pages'].values()[0]['revisions'][0]['*'] #get page content
-                if re.search('{{NoBots}}', content, flags=re.S|re.I): #if there's a {{NoBots}} tag
+                if re.search('{{NoBots.*?}}', content, flags=re.S|re.I): #if there's a {{NoBots}} tag
                     print ' {{NoBots}} in page, skipping.'
                     continue #skip it too
                 summary = 'Automated edit:' #first part of summary
