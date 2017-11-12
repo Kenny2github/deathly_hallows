@@ -197,7 +197,7 @@ for page in cms: #for every title
 
 limit = 10 #yes, it's hardcoded
 r = json.loads(s.get(api, params={'action':'query','list':'random','rnlimit':limit,'rnnamespace':'0','format':'json'}).text)
-pages = ['User:Kenny2scratch/Sandbox 2']#[p['title'] for p in r['query']['random']]
+pages = ['Email_Address_Confirmation']#[p['title'] for p in r['query']['random']]
 for page in pages:
     print 'Page', page
     r = json.loads(s.get(api, params={'action':'query','prop':'revisions','rvlimit':'1','rvprop':'content','titles':page,'format':'json'}).text)
@@ -210,8 +210,12 @@ for page in pages:
                 print ' Found flaw:', k
                 bads.append(k)
         if bads:
-            insert = '{{bad style\n|' + '\n|'.join(bads) + '\n|date={{subst:CURRENTMONTHNAME}} {{subst:CURRENTYEAR}}\n}}'
-            content = re.sub(r'(?P<pre>[\s\S]*)(?P<cats>(?:\[\[[^]]\]\]\n?)*)\n*$', r'\g<pre>' + insert + r'\g<cats>', content)
+            insert = '{{bad style\n|' + '\n|'.join(bads) + '\n|date={{subst:CURRENTMONTHNAME}} {{subst:CURRENTYEAR}}\n}}\n'
+            wikicode = mw.parse(content)
+            links = wikicode.filter_wikilinks()
+            links = list(filter(lambda link: re.match(r'\[\[(Category|[a-z][a-z]):.*\]\]', unicode(link)), links))
+            wikicode.insert_before(links[0], insert)
+            content = unicode(wikicode)
             print 'Edit on page', page + ':', submitedit(
                 page,
                 content,
@@ -223,7 +227,7 @@ for page in pages:
     else:
         print ' {{NoBots}} or {{bad style}} in page, skipping.'
 
-raise SystemExit #uncomment this to stop here
+#raise SystemExit #uncomment this to stop here
 
 """This section is the adding {{inaccurate}} section.
 The process is:
