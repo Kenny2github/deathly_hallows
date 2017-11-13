@@ -3,29 +3,40 @@ import mwparserfromhell as mw, easygui as e
 
 #setup
 s = requests.session() #start a new session
+print 'Loading login data...'
 with open('login.txt') as info: #open login info
     username = info.readline().strip() #username on first line
     password = info.readline().strip() #password on second line
     api = info.readline().strip() #api url on third line
+print 'Loaded login data.'
 #get configuration
+print 'Loading config...'
 r = json.loads(s.get(api, params={'action':'query','prop':'revisions','rvprop':'comment','rvlimit':'1','titles':'User:%s/Config/TemplatesWithDateParams' % username,'format':'json'}).text) #get list of templates with date parameters
 templates = r['query']['pages'].values()[0]['revisions'][0]['comment'] #get the comment of the last revision - the list is stored there
+print ' Loaded config: templates with date parameters'
 r = json.loads(s.get(api, params={'action':'query','prop':'revisions','rvprop':'comment','rvlimit':'1','titles':'User:%s/Config/TemplateDateFormat' % username,'format':'json'}).text) #get format for dates in templates
 dateformat = r['query']['pages'].values()[0]['revisions'][0]['comment'] #get the comment of the last revision - the format is stored there
+print ' Loaded config: template date format'
 r = json.loads(s.get(api, params={'action':'query','prop':'revisions','rvprop':'comment','rvlimit':'1','titles':'User:%s/Config/InaccurateCnCount' % username,'format':'json'}).text) #get number of {{cn}}s for inaccurate template
 cncount = int(r['query']['pages'].values()[0]['revisions'][0]['comment']) #get the comment of the last revision - the number is stored there
+print ' Loaded config: inaccurate {{cn}} count'
 r = json.loads(s.get(api, params={'action':'query','prop':'revisions','rvprop':'content','rvlimit':'1','titles':'User:%s/Config/FirstAndSecondPersonWords' % username,'format':'json'}).text) #get first and second person words
 words = re.search('<pre>(.*)</pre>', r['query']['pages'].values()[0]['revisions'][0]['*'], re.S).group(0).strip().replace('\n', '|') #find the <pre> tag
+print ' Loaded config: first and second person words'
 r = json.loads(s.get(api, params={'action':'query','prop':'revisions','rvprop':'comment','rvlimit':'1','titles':'User:%s/Config/ReferenceFormat' % username,'format':'json'}).text) #get reference format
 refformat = r['query']['pages'].values()[0]['revisions'][0]['comment'] #get the comment of the last revision - the format is stored there
+print ' Loaded config: reference format'
 r = json.loads(s.get(api, params={'action':'query','prop':'revisions','rvprop':'content','rvlimit':'1','titles':'Project:Style Guide','format':'json'}).text) #get the project style guide
 r = r['query']['pages'].values()[0]['revisions'][0]['*']
 r = re.search(r'<!--\nbots::[\s\S]*-->', r).group(0)
 styles = {}
 for match in re.finditer(r'(?P<key>[-a-zA-Z]+): (?P<negate>!?)%(?P<value>.*?)%', r):
     styles[match.group('key')] = {'*': match.group('value'), 'negate': match.group('negate')}
+print ' Loaded config: style guideline regexes'
+print 'Loaded config.'
 
 #login
+print 'Logging in...'
 r = json.loads(s.post(api, params={'action':'login','lgname':username,'format':'json'}).text) #request login token through action=login
 token = r['login']['token'] #get token from result
 r = json.loads(s.post(api, data={'action':'login','lgname':username,'lgpassword':password,'lgtoken':token,'format':'json'}).text) #login with token
@@ -36,6 +47,8 @@ def submitedit(title, content, summary): #submit edit function
     r = json.loads(s.get(api, params={'action':'tokens','type':'edit','format':'json'}).text) #request edittoken
     token = r['tokens']['edittoken'] #get token from result
     r = json.loads(s.post(api, data={'action':'edit','title':title,'text':content,'summary':summary,'token':token,'bot':'true','format':'json'}).text) #long post request for edit
+    if 'error' in r:
+        return 'Failed (' + r['error']['code'] + ')'
     return r['edit']['result'] #return edit result
 
 """
@@ -195,17 +208,19 @@ for page in cms: #for every title
 
 #raise SystemExit #uncomment this to stop here
 
-limit = 10 #yes, it's hardcoded
+"""This section is the {{bad style}} adding section."""
+
+limit = int(raw_input('Enter a number of pages to check for bad style (default 10): ') or '10')
 r = json.loads(s.get(api, params={'action':'query','list':'random','rnlimit':limit,'rnnamespace':'0','format':'json'}).text)
-pages = ['Email_Address_Confirmation']#[p['title'] for p in r['query']['random']]
+pages = [p['title'] for p in r['query']['random']]
 for page in pages:
     print 'Page', page
     r = json.loads(s.get(api, params={'action':'query','prop':'revisions','rvlimit':'1','rvprop':'content','titles':page,'format':'json'}).text)
     content = r['query']['pages'].values()[0]['revisions'][0]['*']
-    if not re.search('(?:{{bad style.*?}}|{{NoBots.*?}})', content, re.S|re.I):
+    if not re.search('(?:{{bad style.*?}}|{{NoBots.*?}}|{{disambig.*?}}|{{faq.*?}}|<.*? class="faqshortanswer".*?>)', content, re.S|re.I):
         bads = []
         for k, v in styles.items():
-            match = (not re.search(v['*'], content) if v['negate'] else re.search(v['*'], content))
+            match = (not re.search(v['*'], content) if v['negate'] else re.search(v['*'], content) and not re.search('<scratchblocks>.*?' + v['*'] + '.*?</scratchblocks>', content, re.S))
             if match:
                 print ' Found flaw:', k
                 bads.append(k)
@@ -213,8 +228,11 @@ for page in pages:
             insert = '{{bad style\n|' + '\n|'.join(bads) + '\n|date={{subst:CURRENTMONTHNAME}} {{subst:CURRENTYEAR}}\n}}\n'
             wikicode = mw.parse(content)
             links = wikicode.filter_wikilinks()
-            links = list(filter(lambda link: re.match(r'\[\[(Category|[a-z][a-z]):.*\]\]', unicode(link)), links))
-            wikicode.insert_before(links[0], insert)
+            links = list(filter(lambda link: re.match(r'\[\[(Category|[a-z][a-z]):.*\]\]', unicode(link), re.I), links))
+            try:
+                wikicode.insert_before(links[0], insert)
+            except IndexError:
+                wikicode = unicode(wikicode) + insert
             content = unicode(wikicode)
             print 'Edit on page', page + ':', submitedit(
                 page,
@@ -224,8 +242,10 @@ for page in pages:
                     count=len(bads)
                 )
             )
+        else:
+            print 'Page', page, 'was not edited - no broken guidelines found.'
     else:
-        print ' {{NoBots}} or {{bad style}} in page, skipping.'
+        print ' {{NoBots}}, {{bad style}}, {{disambig}}, or {{faq}} in page, skipping.'
 
 #raise SystemExit #uncomment this to stop here
 
