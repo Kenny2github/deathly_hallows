@@ -77,11 +77,10 @@ if limit: #if limit != 0
         exp = re.compile(r'(\s|(?=[ -~])\W)(?=[a-zA-Z\']+)(' + words + r')((?=[ -~])\W)', re.I) #compile expression for quick use
         if re.search(exp, content): #if there's a match
             content = re.sub(exp, ur'\1\u2588\2\u2588\3', content) #highlight every instance
-            try: content = e.codebox(u'Modify content below - first and second person are highlighted in \u2588s. Press Cancel or leave blank to cancel.', 'Modify Content of ' + page, content).strip() #pop up box, let them make edits
+            try: content = e.codebox(u'Modify content below - first and second person are highlighted in \u2588s. Press Cancel or leave blank to cancel.', 'Modify Content of ' + page, content).strip() or None #pop up box, let them make edits
             except AttributeError: content = None
-            if len(content) < 1: content = None
             if content is not None: #if it's not None
-                content = re.sub(ur'\u2588([^\u2588\s]+?)\u2588', r'\1', content) #remove all highlights
+                content = content.replace(u'\u2588', '') #remove all highlights
                 print 'Edit on page ' + page + ': ' + submitedit(page, content, 'Semi-automated edit: de-1st/2nd-personified.') #submit the edit
 
 #raise SystemExit #uncomment this to stop here
@@ -111,7 +110,8 @@ if limit: #if limit != 0
         content = r['query']['pages'].values()[0]['revisions'][0]['*'] #get page content
         if re.search('<references */>', content, re.I): #if we have a <references/> tag - that means we have references!
             content = re.sub(r'((?!<ref>%s</ref>)(?:<ref>.*?</ref>))' % refformat,ur'\u2588\1\u2588', content) #monster regex to highlight every instance
-            content = e.codebox(u'Modify content below - bad references are highlighted in \u2588s. Press Cancel or leave blank to cancel.', 'Modify Content of ' + page, content).strip() or None #pop up box, and get result, make it None if it's empty
+            try: content = e.codebox(u'Modify content below - bad references are highlighted in \u2588s. Press Cancel or leave blank to cancel.', 'Modify Content of ' + page, content).strip() or None #pop up box, and get result, make it None if it's empty
+            except AttributeError: content = None
             if content is not None: #if it's not None
                 content = re.sub(ur'\u2588([^\u2588]*?)\u2588', r'\1', content, re.S) #remove all highlights
                 print 'Edit on page ' + page + ': ' + submitedit(page, content, 'Semi-automated edit: updated references to follow format.') #submit the edit
