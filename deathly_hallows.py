@@ -66,11 +66,13 @@ It asks for user input as to how many pages to depersonify, and, if the input is
 limit = int(raw_input('Press Enter to skip de-personifying, or a number (then Enter) to do it on that amount of pages: ') or '0') #limit is int(input) or 0
 if limit: #if limit != 0
     pages = [] #no pages yet
+    print ' Requesting', limit, 'random pages...'
     while limit > 0: #while we still have pages left to get
         r = json.loads(s.get(api, params={'action':'query','list':'random','rnlimit':str(limit % 20 if limit > 20 else limit),'rnnamespace':'0','format':'json'}).text) #get list of random pages
         limit -= 20 #limit -= 20
         r = r['query']['random'] #narrow down to list
         pages += [p['title'] for p in r] #titles, not page dicts
+    print ' Requested', len(pages), 'random pages.'
     for page in pages: #for every page
         r = json.loads(s.get(api, params={'action':'query','prop':'revisions','titles':page,'rvprop':'content','format':'json'}).text) #get page
         content = r['query']['pages'].values()[0]['revisions'][0]['*'] #get page content
@@ -100,11 +102,13 @@ It asks for user input as to how many pages to depersonify, and, if the input is
 limit = int(raw_input('Press Enter to skip reference updating, or a number (then Enter) to do it on that amount of pages: ') or '0') #limit is int(input) or 0
 if limit: #if limit != 0
     pages = [] #no pages yet
+    print ' Requesting', limit, 'random pages...'
     while limit > 0: #while we still have pages left to get
         r = json.loads(s.get(api, params={'action':'query','list':'random','rnlimit':str(limit % 20 if limit > 20 else limit),'rnnamespace':'0','format':'json'}).text) #get list of random pages
         limit -= 20 #limit -= 20
         r = r['query']['random'] #narrow down to list
         pages += [p['title'] for p in r] #titles, not page dicts
+    print ' Requested', len(pages), 'random pages.'
     for page in pages: #for every page
         r = json.loads(s.get(api, params={'action':'query','prop':'revisions','titles':page,'rvprop':'content','format':'json'}).text) #get page
         content = r['query']['pages'].values()[0]['revisions'][0]['*'] #get page content
@@ -211,8 +215,10 @@ for page in cms: #for every title
 """This section is the {{bad style}} adding section."""
 
 limit = int(raw_input('Enter a number of pages to check for bad style (default 10): ') or '10')
+print ' Requesting', limit, 'random pages...'
 r = json.loads(s.get(api, params={'action':'query','list':'random','rnlimit':limit,'rnnamespace':'0','format':'json'}).text)
 pages = [p['title'] for p in r['query']['random']]
+print ' Requested', len(pages), 'random pages.'
 for page in pages:
     print 'Page', page
     r = json.loads(s.get(api, params={'action':'query','prop':'revisions','rvlimit':'1','rvprop':'content','titles':page,'format':'json'}).text)
