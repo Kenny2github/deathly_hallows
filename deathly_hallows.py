@@ -268,12 +268,12 @@ try:
 except IOError: #if there isn't any cache
     cache = [] #make an empty cache
 
-r = json.loads(s.get(api, params={'action':'query','list':'embeddedin','eititle':'Template:Citation needed','eilimit':'max','format':'json'}).text) #get embeddedins for citation needed
+r = json.loads(s.get(api, params={'action':'query','list':'embeddedin','eititle':'Template:Citation needed','eilimit':'max','einamespace':'0|4|12','format':'json'}).text) #get embeddedins for citation needed
 r = r['query']['embeddedin'] #narrow down to list
 eis = [] #empty list for now
 for ei in r: #for every embeddedin
     eis.append(ei['title']) #add its title to list
-r = json.loads(s.get(api, params={'action':'query','list':'embeddedin','eititle':'Template:Cn','eilimit':'max','format':'json'}).text) #get embeddedins for cn
+r = json.loads(s.get(api, params={'action':'query','list':'embeddedin','eititle':'Template:Cn','eilimit':'max','einamespace':'0|4|12','format':'json'}).text) #get embeddedins for cn
 r = r['query']['embeddedin'] #narrow down to list
 for ei in r: #for every extra embeddedin
     eis.append(ei['title']) #add it too
