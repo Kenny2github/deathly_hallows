@@ -117,7 +117,7 @@ if limit: #if limit != 0
             try: content = e.codebox(u'Modify content below - bad references are highlighted in \u2588s. Press Cancel or leave blank to cancel.', 'Modify Content of ' + page, content).strip() or None #pop up box, and get result, make it None if it's empty
             except AttributeError: content = None
             if content is not None: #if it's not None
-                content = re.sub(ur'\u2588([^\u2588]*?)\u2588', r'\1', content, re.S) #remove all highlights
+                content = content.replace(u'\u2588', '') #remove all highlights
                 print 'Edit on page ' + page + ': ' + submitedit(page, content, 'Semi-automated edit: updated references to follow format.') #submit the edit
 else:
     del limit #otherwise just delete limit
