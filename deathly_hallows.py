@@ -13,8 +13,15 @@ print 'Loaded login data.'
 print 'Loading config...'
 r = json.loads(s.get(api, params={'action':'query','list':'embeddedin','eititle':'Template:Check date','eilimit':'max','einamespace':10,'format':'json'}).text) #get embeddedins for check date
 r = r['query']['embeddedin'] #narrow down to list
-r = [ei['title'].replace('Template:', '(?:Template:)?') for ei in r if not ei['title'].endswith('/doc')]
-templates = '|'.join(r)
+r = [ei['title'] for ei in r if not ei['title'].endswith('/doc')]
+templates = r[:]
+for temp in r: #for every template
+    d = json.loads(s.get(api, params={'action':'query','list':'backlinks','bltitle':temp,'blnamespace':10,'blfilterredir':'redirects','bllimit':'max','format':'json'}).text) #get all redirects to that template
+    d = d['query']['backlinks']
+    d = [p['title'] for p in d]
+    templates.extend(d)
+templates = [temp.replace('Template:', '(?:Template:)?') for temp in templates]
+templates = '|'.join(templates)
 print ' Loaded config: templates with date parameters'
 r = json.loads(s.get(api, params={'action':'query','prop':'revisions','rvprop':'comment','rvlimit':'1','titles':'User:%s/Config/TemplateDateFormat' % username,'format':'json'}).text) #get format for dates in templates
 dateformat = r['query']['pages'].values()[0]['revisions'][0]['comment'] #get the comment of the last revision - the format is stored there
