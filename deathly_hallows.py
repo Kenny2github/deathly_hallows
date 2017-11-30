@@ -1,5 +1,5 @@
-import requests, re, json, time, xmlx, sys
-import mwparserfromhell as mw, easygui as e
+import requests, re, json, time, xmlx, sys, os
+import mwparserfromhell as mw, easygui as e, cPickle as pickle
 
 #setup
 s = requests.session() #start a new session
@@ -11,37 +11,49 @@ with open('login.txt') as info: #open login info
 print 'Loaded login data.'
 #get configuration
 print 'Loading config...'
-r = json.loads(s.get(api, params={'action':'query','list':'embeddedin','eititle':'Template:Check date','eilimit':'max','einamespace':10,'format':'json'}).text) #get embeddedins for check date
-r = r['query']['embeddedin'] #narrow down to list
-r = [ei['title'] for ei in r if not ei['title'].endswith('/doc')]
-templates = r[:]
-for temp in r: #for every template
-    d = json.loads(s.get(api, params={'action':'query','list':'backlinks','bltitle':temp,'blnamespace':10,'blfilterredir':'redirects','bllimit':'max','format':'json'}).text) #get all redirects to that template
-    d = d['query']['backlinks']
-    d = [p['title'] for p in d]
-    templates.extend(d)
-templates = [temp.replace('Template:', '(?:Template:)?') for temp in templates]
-templates = '|'.join(templates)
-print ' Loaded config: templates with date parameters'
-r = json.loads(s.get(api, params={'action':'query','prop':'revisions','rvprop':'comment','rvlimit':'1','titles':'User:%s/Config/TemplateDateFormat' % username,'format':'json'}).text) #get format for dates in templates
-dateformat = r['query']['pages'].values()[0]['revisions'][0]['comment'] #get the comment of the last revision - the format is stored there
-print ' Loaded config: template date format'
-r = json.loads(s.get(api, params={'action':'query','prop':'revisions','rvprop':'comment','rvlimit':'1','titles':'User:%s/Config/InaccurateCnCount' % username,'format':'json'}).text) #get number of {{cn}}s for inaccurate template
-cncount = int(r['query']['pages'].values()[0]['revisions'][0]['comment']) #get the comment of the last revision - the number is stored there
-print ' Loaded config: inaccurate {{cn}} count'
-r = json.loads(s.get(api, params={'action':'query','prop':'revisions','rvprop':'content','rvlimit':'1','titles':'User:%s/Config/FirstAndSecondPersonWords' % username,'format':'json'}).text) #get first and second person words
-words = re.search('<pre>(.*)</pre>', r['query']['pages'].values()[0]['revisions'][0]['*'], re.S).group(0).strip().replace('\n', '|') #find the <pre> tag
-print ' Loaded config: first and second person words'
-r = json.loads(s.get(api, params={'action':'query','prop':'revisions','rvprop':'comment','rvlimit':'1','titles':'User:%s/Config/ReferenceFormat' % username,'format':'json'}).text) #get reference format
-refformat = r['query']['pages'].values()[0]['revisions'][0]['comment'] #get the comment of the last revision - the format is stored there
-print ' Loaded config: reference format'
-r = json.loads(s.get(api, params={'action':'query','prop':'revisions','rvprop':'content','rvlimit':'1','titles':'Project:Style Guide','format':'json'}).text) #get the project style guide
-r = r['query']['pages'].values()[0]['revisions'][0]['*']
-r = re.search(r'<!--\nbots::[\s\S]*-->', r).group(0)
-styles = {}
-for match in re.finditer(r'(?P<key>[-a-zA-Z]+): (?P<negate>!?)%(?P<value>.*?)%', r):
-    styles[match.group('key')] = {'*': match.group('value'), 'negate': match.group('negate')}
-print ' Loaded config: style guideline regexes'
+if '--refresh-config' in sys.argv or 'config.pickle' not in os.listdir('.'):
+    print ' Fetching config...'
+    r = json.loads(s.get(api, params={'action':'query','list':'embeddedin','eititle':'Template:Check date','eilimit':'max','einamespace':10,'format':'json'}).text) #get embeddedins for check date
+    r = r['query']['embeddedin'] #narrow down to list
+    r = [ei['title'] for ei in r if not ei['title'].endswith('/doc')]
+    templates = r[:]
+    for temp in r: #for every template
+        d = json.loads(s.get(api, params={'action':'query','list':'backlinks','bltitle':temp,'blnamespace':10,'blfilterredir':'redirects','bllimit':'max','format':'json'}).text) #get all redirects to that template
+        d = d['query']['backlinks']
+        d = [p['title'] for p in d]
+        templates.extend(d)
+    templates = [temp.replace('Template:', '(?:Template:)?') for temp in templates]
+    templates = '|'.join(templates)
+    print ' Loaded config: templates with date parameters'
+    r = json.loads(s.get(api, params={'action':'query','prop':'revisions','rvprop':'comment','rvlimit':'1','titles':'User:%s/Config/TemplateDateFormat' % username,'format':'json'}).text) #get format for dates in templates
+    dateformat = r['query']['pages'].values()[0]['revisions'][0]['comment'] #get the comment of the last revision - the format is stored there
+    print ' Loaded config: template date format'
+    r = json.loads(s.get(api, params={'action':'query','prop':'revisions','rvprop':'comment','rvlimit':'1','titles':'User:%s/Config/InaccurateCnCount' % username,'format':'json'}).text) #get number of {{cn}}s for inaccurate template
+    cncount = int(r['query']['pages'].values()[0]['revisions'][0]['comment']) #get the comment of the last revision - the number is stored there
+    print ' Loaded config: inaccurate {{cn}} count'
+    r = json.loads(s.get(api, params={'action':'query','prop':'revisions','rvprop':'content','rvlimit':'1','titles':'User:%s/Config/FirstAndSecondPersonWords' % username,'format':'json'}).text) #get first and second person words
+    words = re.search('<pre>(.*)</pre>', r['query']['pages'].values()[0]['revisions'][0]['*'], re.S).group(0).strip().replace('\n', '|') #find the <pre> tag
+    print ' Loaded config: first and second person words'
+    r = json.loads(s.get(api, params={'action':'query','prop':'revisions','rvprop':'comment','rvlimit':'1','titles':'User:%s/Config/ReferenceFormat' % username,'format':'json'}).text) #get reference format
+    refformat = r['query']['pages'].values()[0]['revisions'][0]['comment'] #get the comment of the last revision - the format is stored there
+    print ' Loaded config: reference format'
+    r = json.loads(s.get(api, params={'action':'query','prop':'revisions','rvprop':'content','rvlimit':'1','titles':'Project:Style Guide','format':'json'}).text) #get the project style guide
+    r = r['query']['pages'].values()[0]['revisions'][0]['*']
+    r = re.search(r'<!--\nbots::[\s\S]*-->', r).group(0)
+    styles = {}
+    for match in re.finditer(r'(?P<key>[-a-zA-Z]+): (?P<negate>!?)%(?P<value>.*?)%', r):
+        styles[match.group('key')] = {'*': match.group('value'), 'negate': match.group('negate')}
+    print ' Loaded config: style guideline regexes'
+    print ' Pickling config...'
+    with open('config.pickle', 'wb') as f: pickle.dump((
+        templates, dateformat, cncount,
+        words, refformat, styles), f, -1)
+    print ' Pickled config.'
+else:
+    print ' Using cached config.'
+    with open('config.pickle', 'rb') as f:
+        templates, dateformat, cncount, words, refformat, styles = pickle.load(f)
+        print ' Loaded config: everything'
 print 'Loaded config.'
 
 #login
@@ -236,13 +248,19 @@ for page in pages:
     print 'Page', page
     r = json.loads(s.get(api, params={'action':'query','prop':'revisions','rvlimit':'1','rvprop':'content','titles':page,'format':'json'}).text)
     content = r['query']['pages'].values()[0]['revisions'][0]['*']
+    ignore = re.search('<div[^>]*>[^<]*bad style ignore:\n([-a-zA-Z]+(?:\|[-a-zA-Z]+)*)[^<]*</div>', content)
+    if ignore is None:
+        ignore = []
+    else:
+        ignore = ignore.group(1).split('|')
     if not re.search('(?:{{bad style.*?}}|{{NoBots.*?}}|{{disambig.*?}}|{{faq.*?}}|<.*? class="faqshortanswer".*?>)', content, re.S|re.I):
         bads = []
         for k, v in styles.items():
-            match = (not re.search(v['*'], content) if v['negate'] else re.search(v['*'], content) and not re.search('<scratchblocks>.*?' + v['*'] + '.*?</scratchblocks>', content, re.S))
-            if match:
-                print ' Found flaw:', k
-                bads.append(k)
+            if k not in ignore:
+                match = (not re.search(v['*'], content) if v['negate'] else re.search(v['*'], content) and not re.search('<scratchblocks>.*?' + v['*'] + '.*?</scratchblocks>', content, re.S))
+                if match:
+                    print ' Found flaw:', k
+                    bads.append(k)
         if bads:
             insert = '{{bad style\n|' + '\n|'.join(bads) + '\n|date={{subst:CURRENTMONTHNAME}} {{subst:CURRENTYEAR}}\n}}\n'
             wikicode = mw.parse(content)
@@ -281,7 +299,6 @@ The process is:
 5. Pickle the updated cache.
 """
 
-import cPickle as pickle #import pickle
 try:
     with open('inaccuratecache.pickle', 'rb') as f: cache = pickle.load(f) #load cache
 except IOError: #if there isn't any cache
