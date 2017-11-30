@@ -1,4 +1,4 @@
-import requests, re, json, time, xmlx
+import requests, re, json, time, xmlx, sys
 import mwparserfromhell as mw, easygui as e
 
 #setup
@@ -55,6 +55,10 @@ print 'Login result:', result #print result
 def submitedit(title, content, summary): #submit edit function
     r = json.loads(s.get(api, params={'action':'tokens','type':'edit','format':'json'}).text) #request edittoken
     token = r['tokens']['edittoken'] #get token from result
+    if '--confirmedit' in sys.argv:
+        confirm = e.codebox('Confirm edit on {page}'.format(page=title), 'Confirm Edit', content)
+        if confirm is None or not confirm.strip():
+            return 'Cancelled'
     r = json.loads(s.post(api, data={'action':'edit','title':title,'text':content,'summary':summary,'token':token,'bot':'true','format':'json'}).text) #long post request for edit
     if 'error' in r:
         return 'Failed (' + r['error']['code'] + ')'
@@ -277,7 +281,7 @@ The process is:
 5. Pickle the updated cache.
 """
 
-import cPickle as pickle, sys #import pickle and sys
+import cPickle as pickle #import pickle
 try:
     with open('inaccuratecache.pickle', 'rb') as f: cache = pickle.load(f) #load cache
 except IOError: #if there isn't any cache
