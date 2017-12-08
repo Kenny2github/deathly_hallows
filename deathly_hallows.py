@@ -257,7 +257,7 @@ for page in pages:
         bads = []
         for k, v in styles.items():
             if k not in ignore:
-                match = (not re.search(v['*'], content) if v['negate'] else re.search(v['*'], content) and not re.search('<scratchblocks>.*?' + v['*'] + '.*?</scratchblocks>', content, re.S))
+                match = (not re.search(v['*'], content) if v['negate'] else re.search(v['*'], content) and not re.search('<(?P<spe>scratchblocks|pre)>.*?' + v['*'] + '.*?</(?P=spe)>', content, re.S))
                 if match:
                     print ' Found flaw:', k
                     bads.append(k)
