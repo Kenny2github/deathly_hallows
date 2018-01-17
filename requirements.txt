@@ -1,0 +1,4 @@
+requests
+mwparserfromhell
+xmlx
+easygui
