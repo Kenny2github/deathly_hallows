@@ -1,4 +1,4 @@
-import requests, re, json, time, xmlx, sys, os
+import requests, re, json, time, sys, os
 import mwparserfromhell as mw, easygui as e, cPickle as pickle
 
 #setup
@@ -165,11 +165,9 @@ def gd(page, template): #get date from diffs function
 The process is:
 1. Get a list of revision IDs, and for each revision:
     1. Get the difference to the previous revision,
-    2. Remove all "del" tags from the diff,
-    3. Convert all of the remaining tags to xmlx Elements for easier handling,
-    4. Recursively remove all "del" tags from all children,
-    5. Use a monster regex to find out if this diff added the particular template we're looking for,
-    6. If it did, set the date to a time.struct_time from the revision timestamp, and break.
+    2. Get a list of tags whose names are not "del"
+    3. Use a monster regex to find out if this diff added the particular template we're looking for,
+    4. If it did, set the date to a time.struct_time from the revision timestamp, and break.
 2. If the date was never set, assume it's the date of the earliest revision,
 3. Get the month name and year, and return that."""
     print '  Getting date' #log getting date
@@ -181,16 +179,9 @@ The process is:
         r = json.loads(s.get(api, params={'action':'query','prop':'revisions','titles':page,'rvstartid':rev['revid'],'rvendid':rev['revid'],'rvdiffto':'prev','format':'json'}).text) #get diff to prev using this rev's revid
         diff = r['query']['pages'].values()[0]['revisions'][0] #narrow down to revision
         try:
-            difftags = mw.parse(diff['diff']['*']).filter_tags() #filter tags for better processing
-            tags = [] #blank for now
-            for i in difftags: #for every tag
-                try: tags.append(xmlx.Element(str(i))) #convert tag to str and make it an element, then append
-                except: continue #if it couldn't be converted or wasn't parsable, continue
-            tags = [i for i in tags if i.name != 'del'] #remove all the del tags
-            for tag in tags:
-                i.removechildren(lambda e:e.name == 'del') #remove del tags from all children
+            tags = [t for t in mw.parse(diff['diff']['*']).ifilter_tags() if t.tag != 'del'] #filter tags for better processing
             for tag in tags: #for every remaining tag
-                if re.search(r'(?:{{((?:%s)(?![^{}]*?\|date=%s)[^{}]*?)}})|(?:{{[^{}]*?<([^<>/]*?)[^<>/]*?>%s</\2>[^{}]*?}})' % (template, dateformat, template), tag.content, re.S|re.I): #check if there was 
+                if re.search(r'(?:{{((?:%s)(?![^{}]*?\|date=%s)[^{}]*?)}})|(?:{{[^{}]*?<([^<>/]*?)[^<>/]*?>%s</\2>[^{}]*?}})' % (template, dateformat, template), str(tag.contents), re.S|re.I): #check if there was 
                     date = time.strptime(diff['timestamp'], '%Y-%m-%dT%H:%M:%SZ') #get date if it was
                     break #we've found the date, get outta here
             if date is not None: #we've found the date
@@ -199,7 +190,9 @@ The process is:
             continue #skip the hidden revision
     if not date: #if date is still none
         date = time.strptime(rvs[-1]['timestamp'], '%Y-%m-%dT%H:%M:%SZ') #assume it's the earliest revision
-    date = [None, 'January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'][date.tm_mon] + ' ' + str(date.tm_year) #get month and year
+    date = [None, 'January', 'February', 'March', 'April',
+            'May', 'June', 'July', 'August', 'September',
+            'October', 'November', 'December'][date.tm_mon] + ' ' + str(date.tm_year) #get month and year
     print '  Found date:', date #log found date
     return date #return the month name and year
 
