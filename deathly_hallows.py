@@ -93,7 +93,7 @@ if limit: #if limit != 0
     pages = [] #no pages yet
     print ' Requesting', limit, 'random pages...'
     while limit > 0: #while we still have pages left to get
-        r = json.loads(s.get(api, params={'action':'query','list':'random','rnlimit':str(limit % 20 if limit > 20 else limit),'rnnamespace':'0','format':'json'}).text) #get list of random pages
+        r = json.loads(s.get(api, params={'action':'query','list':'random','rnlimit':unicode(limit % 20 if limit > 20 else limit),'rnnamespace':'0','format':'json'}).text) #get list of random pages
         limit -= 20 #limit -= 20
         r = r['query']['random'] #narrow down to list
         pages += [p['title'] for p in r] #titles, not page dicts
@@ -129,7 +129,7 @@ if limit: #if limit != 0
     pages = [] #no pages yet
     print ' Requesting', limit, 'random pages...'
     while limit > 0: #while we still have pages left to get
-        r = json.loads(s.get(api, params={'action':'query','list':'random','rnlimit':str(limit % 20 if limit > 20 else limit),'rnnamespace':'0','format':'json'}).text) #get list of random pages
+        r = json.loads(s.get(api, params={'action':'query','list':'random','rnlimit':unicode(limit % 20 if limit > 20 else limit),'rnnamespace':'0','format':'json'}).text) #get list of random pages
         limit -= 20 #limit -= 20
         r = r['query']['random'] #narrow down to list
         pages += [p['title'] for p in r] #titles, not page dicts
@@ -181,7 +181,7 @@ The process is:
         try:
             tags = [t for t in mw.parse(diff['diff']['*']).ifilter_tags() if t.tag != 'del'] #filter tags for better processing
             for tag in tags: #for every remaining tag
-                if re.search(r'(?:{{((?:%s)(?![^{}]*?\|date=%s)[^{}]*?)}})|(?:{{[^{}]*?<([^<>/]*?)[^<>/]*?>%s</\2>[^{}]*?}})' % (template, dateformat, template), str(tag.contents), re.S|re.I): #check if there was 
+                if re.search(r'(?:{{((?:%s)(?![^{}]*?\|date=%s)[^{}]*?)}})|(?:{{[^{}]*?<([^<>/]*?)[^<>/]*?>%s</\2>[^{}]*?}})' % (template, dateformat, template), unicode(tag.contents), re.S|re.I): #check if there was 
                     date = time.strptime(diff['timestamp'], '%Y-%m-%dT%H:%M:%SZ') #get date if it was
                     break #we've found the date, get outta here
             if date is not None: #we've found the date
@@ -192,7 +192,7 @@ The process is:
         date = time.strptime(rvs[-1]['timestamp'], '%Y-%m-%dT%H:%M:%SZ') #assume it's the earliest revision
     date = [None, 'January', 'February', 'March', 'April',
             'May', 'June', 'July', 'August', 'September',
-            'October', 'November', 'December'][date.tm_mon] + ' ' + str(date.tm_year) #get month and year
+            'October', 'November', 'December'][date.tm_mon] + ' ' + unicode(date.tm_year) #get month and year
     print '  Found date:', date #log found date
     return date #return the month name and year
 
@@ -221,7 +221,7 @@ for page in cms: #for every title
         summary += ' added date to templates;' #add to summary
     if len(re.findall('{{(cn|citation needed)}}', content)) > cncount and not re.search('{{inaccurate[^{}]*?}}', content, flags=re.S|re.I): #if over cncount cns and {{inaccurate}} hasn't already been added
         content = '{{inaccurate|date={{subst:CURRENTMONTHNAME}} {{subst:CURRENTYEAR}}}}' + content #add inaccurate template to top (with date)
-        summary += ' added {{inaccurate}} (' + str(len(re.findall('{{(cn)|(citation needed)}}', content))) + ' {{citation needed}}s);' #add to summary
+        summary += ' added {{inaccurate}} (' + unicode(len(re.findall('{{(cn)|(citation needed)}}', content))) + ' {{citation needed}}s);' #add to summary
     if summary != 'Automated edit:': #if something happened
         print "Edit on page", page, "with summary '" + summary + "':", submitedit(page, content, summary[:-1]) #submit the edit
     else:
@@ -330,8 +330,8 @@ try:
                 detected = len(re.findall('{{(cn|citation needed)[^{}]*?}}', content)) #number of cns
                 if detected > cncount and not re.search('{{inaccurate[^{}]*?}}', content, flags=re.S|re.I): #if over cncount cns and {{inaccurate}} hasn't already been added
                     content = '{{inaccurate|date={{subst:CURRENTMONTHNAME}} {{subst:CURRENTYEAR}}}}' + content #add inaccurate template to top (with date)
-                    summary += ' added {{inaccurate}} (' + str(detected) + ' {{citation needed}}s);' #add to summary
-                    print ' ' + str(detected) + ' {{citation neeeded}}s' #log how many cns
+                    summary += ' added {{inaccurate}} (' + unicode(detected) + ' {{citation needed}}s);' #add to summary
+                    print ' ' + unicode(detected) + ' {{citation neeeded}}s' #log how many cns
                 if summary != 'Automated edit:': #if something happened
                     print "Edit on page", page, "with summary '" + summary + "':", submitedit(page, content, summary[:-1]) #submit the edit
                 else:
