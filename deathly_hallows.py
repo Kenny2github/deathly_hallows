@@ -24,8 +24,8 @@ if '--refresh-config' in sys.argv or 'config.pickle' not in os.listdir('.'):
     CONFIG['arbit'] = list(sw.page(f'User:{USERNAME}/Config/ArbitraryPages')
                            .revisions(1))[0].comment.split(';')
     print(' Loaded config: arbitrary page names')
-    gen = sw.template(CONFIG['arbit'][0]).transclusions(namespace=10)
-    gen = [ei for ei in gen if not ei.title.endswith('/doc')] #no documentations
+    gen = sw.category(CONFIG['arbit'][0]).categorymembers(cmnamespace=10)
+    gen = [cm for cm in gen if not cm.title.endswith('/doc')] #no documentations
     templates = gen[:]
     for temp_ in gen: #for every template
         links = temp_.backlinks(blfilterredir='redirects', blnamespace=10) #get template redirects
@@ -33,7 +33,7 @@ if '--refresh-config' in sys.argv or 'config.pickle' not in os.listdir('.'):
     templates = [temp.title.replace('Template:',
                                     '(?:Template:)?') for temp in templates]
     CONFIG['templates'] = '|'.join(templates) #join into one alternative
-    del templates, gen, links #not for export (?)
+    del templates, gen #not for export (?)
     print(' Loaded config: templates with date parameters')
     CONFIG['dateformat'] = list(sw.page(f'User:{USERNAME}/Config/TemplateDateFormat')
                                 .revisions(1))[0].comment
@@ -80,8 +80,8 @@ def submitedit(pageobj_, contents_, summ):
         confirm = e.codebox(f'Confirm edit on {page}', 'Confirm Edit', contents_)
         if confirm is None or not confirm.strip():
             return 'Cancelled'
-    print(pageobj_.title, summ, contents_, sep='\n')#result=pageobj_.edit(contents,summ,nocreate=1)
-    #return result['edit']['result']
+    result = pageobj_.edit(contents_, summ, nocreate=1)
+    return result['edit']['result']
 
 # This section is the de-1st/2nd-personifying section.
 # It asks for user input as to how many pages to depersonify,
@@ -203,14 +203,12 @@ The process is:
         parsedcontents = mwp.parse(rev.__dict__['*'], 0, True) #hack
         has_template = False
         for temp in parsedcontents.ifilter_templates():
-            if temp.name.lower() == templatename and temp.has('date'):
+            if temp.name.lower() == templatename and not temp.has('date'):
                 has_template = True
                 break
-        if has_template:
-            continue
-        else:
+        if not has_template:
             break
-    interesting = mwp.parse(processed[-2].__dict__['*'])
+    interesting = processed[-2] if len(processed) >= 2 else processed[0]
     date = time.strptime(interesting.timestamp, '%Y-%m-%dT%H:%M:%SZ')
     date = [None, 'January', 'February', 'March', 'April',
             'May', 'June', 'July', 'August', 'September',
@@ -235,13 +233,13 @@ for page in cms: #for every title
     #add dates! :)
     go_on = False
     for template in parsed.ifilter_templates():
-        if re.search(CONFIG['templates'], template.name, re.I) \
+        if re.search(CONFIG['templates'], str(template.name), re.I) \
                 and not template.has('date'):
-            template.add('date', get_date(page, template))
+            template.add('date', get_date(page, template.name))
             go_on = True #at least one template was changed
     if go_on:         #if ^
         print("Edit on page", page.title + ":",
-              submitedit(page, content,
+              submitedit(page, str(parsed),
                          'Automated edit: added dates to templates')) #submit the edit!
     else:
         print("Page", page.title, "was not edited.") #no change
@@ -266,7 +264,7 @@ for page in pages:
             break
     go_on = True
     for template in parsed.ifilter_templates():
-        if template.name.lower() in (CONFIG['arbit'][2].lower(), 'nobots'):
+        if template.name.lower() in (CONFIG['arbit'][2].lower(), 'nobots', 'disambig', 'faq'):
             go_on = False
             break
     if go_on:
@@ -288,7 +286,7 @@ for page in pages:
                                                       str(link.title), re.I), links))
             try:
                 parsed.insert_before(links[0], insert)
-            except ValueError:
+            except (ValueError, IndexError):
                 parsed.append(insert)
             content = str(parsed)
             print('Edit on page', page + ':', submitedit(
@@ -328,7 +326,7 @@ except IOError: #if there isn't any cache
 
 eis = [] #empty list for now
 eis.extend([ei.title for ei in sw.template('citation needed').transclusions(namespace='0|4|12')])
-eis.extend([ei.title for ei in sw.template('cn').transclusions('0|4|12')])
+eis.extend([ei.title for ei in sw.template('cn').transclusions(namespace='0|4|12')])
 for ei in sw.template('inaccurate').transclusions(): #for every embeddedin
     if ei.title in eis:
         eis.remove(ei.title)
