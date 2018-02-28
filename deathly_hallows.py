@@ -38,8 +38,8 @@ if '--refresh-config' in sys.argv or 'config.pickle' not in os.listdir('.'):
     CONFIG['dateformat'] = list(sw.page(f'User:{USERNAME}/Config/TemplateDateFormat')
                                 .revisions(1))[0].comment
     print(' Loaded config: template date format')
-    CONFIG['cncount'] = list(sw.page(f'User:{USERNAME}/Config/InaccurateCnCount')
-                             .revisions(1))[0].comment
+    CONFIG['cncount'] = int(list(sw.page(f'User:{USERNAME}/Config/InaccurateCnCount')
+                             .revisions(1))[0].comment)
     print(' Loaded config: inaccurate {{cn}} count')
     contents = sw.page(f'User:{USERNAME}/Config/FirstAndSecondPersonWords').read()
     CONFIG['words'] = re.search('<pre>(.*)</pre>',
@@ -289,7 +289,7 @@ for page in pages:
             except (ValueError, IndexError):
                 parsed.append(insert)
             content = str(parsed)
-            print('Edit on page', page + ':', submitedit(
+            print('Edit on page', page.title + ':', submitedit(
                 page,
                 content,
                 'Automated edit: added {} ({} guidelines broken)'.format(
