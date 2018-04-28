@@ -49,15 +49,9 @@ if '--refresh-config' in sys.argv or 'config.pickle' not in os.listdir('.'):
     CONFIG['refformat'] = list(sw.page(f'User:{USERNAME}/Config/ReferenceFormat')
                                .revisions(1))[0].comment
     print(' Loaded config: reference format')
-    contents = sw.page(f'User:{USERNAME}/Config/StyleRegexes').read()
-    contents = re.search(r'<pre>(.*?)</pre>', contents, re.S).group(1)
-    CONFIG['styles'] = {}
-    for match in re.finditer(r'(?P<key>[-a-zA-Z]+): (?P<negate>!?)%(?P<value>.*?)%', contents):
-        CONFIG['styles'][match.group('key')] = {
-            '*': match.group('value'), 'negate': match.group('negate')
-        }
-    del contents #not for export (?)
-    print(' Loaded config: style guideline regexes')
+    CONFIG['styletags'] = list(sw.page(f'User:{USERNAME}/Config/BadStyleIgnoreTags')
+                               .revisions(1))[0].comment.split('|')
+    print(' Loaded config: bad style ignore tags')
     print(' Pickling config...')
     with open('config.pickle', 'wb') as config:
         pickle.dump(CONFIG, config, -1)
@@ -68,6 +62,190 @@ else:
         CONFIG = pickle.load(config)
         print(' Loaded config: everything')
 print('Loaded config.')
+
+class StyleGuide(object): #style guide rules
+    @staticmethod
+    def _remove_ignore(parsed):
+        parsed = mwp.parse(str(parsed))
+        for tag in parsed.ifilter_tags():
+            if tag.tag in CONFIG['styletags']:
+                parsed.remove(tag)
+        return parsed
+
+    @staticmethod
+    def no_spaces_inside_apos(parsed):
+        parsed = StyleGuide._remove_ignore(parsed)
+        for thing in parsed.ifilter(
+            matches=lambda n: getattr(n, 'tag', None) in ('i', 'b')
+        ):
+            if getattr(thing, 'contents', '').startswith(' ') \
+                   or getattr(thing, 'contents', '').endswith(' '):
+                return False
+        return True
+
+    @staticmethod
+    def no_link_underscores(parsed):
+        for link in parsed.ifilter_wikilinks():
+            if '_' in link.title:
+                return False
+        return True
+
+    @staticmethod
+    def no_section_underscores(parsed):
+        for link in parsed.ifilter_wikilinks():
+            if '#' not in link.title:
+                continue
+            section = link.title.split('#', 1)[1]
+            if re.search(r'(\.[0-9A-Fa-f][0-9A-Fa-f]|_)', str(section)):
+                return False
+        return True
+
+    @staticmethod
+    def no_cat_underscores(parsed):
+        for link in parsed.ifilter_wikilinks():
+            if link.title.startswith('Category:') and '_' in link.title:
+                return False
+        return True
+
+    @staticmethod
+    def cat_at_end(parsed):
+        parsed = StyleGuide._remove_ignore(parsed)
+        links = parsed.filter_wikilinks()
+        links = list(l for l in links
+                     if not re.match('^[a-z][a-z](-[a-z]+|[a-z])?:',
+                                     str(l.title)))
+        if not links[-1].title.startswith('Category:'):
+            return False #not even the last non-interwikilink is a category link
+        nodes = list(n for n in parsed.nodes
+                     if not re.match('^[a-z][a-z](-[a-z]+|[a-z])?:',
+                                     str(getattr(n, 'title', ''))))
+        nodes = list(n for n in nodes if n.strip())
+        if not str(getattr(nodes[-1], 'title', '')).startswith('Category:'):
+            # by the way, str(nodes[-1].title) can't possibly start with
+            # Category: if it isn't a link (str(the builtin method) is
+            # <built-in...)
+            return False #the last non-interwikilink node isn't a catlink
+        return True
+
+    @staticmethod
+    def no_capitalized_templates(parsed):
+        for template in parsed.ifilter_templates():
+            if re.match('^[A-Z][^A-Z]+$', str(template.name)):
+                return False
+        return True
+
+    @staticmethod
+    def pipe_at_line_start(parsed):
+        for template in parsed.ifilter_templates():
+            for param in template.params:
+                if param.startswith('\n'):
+                    return False
+        return True
+
+    @staticmethod
+    def nwc_param_text(parsed):
+        for template in parsed.ifilter_templates():
+            if template.name in ('note', 'warning', 'caution'):
+                if not template.has('1'):
+                    return False
+        return True
+
+    @staticmethod
+    def no_main_underscores(parsed):
+        for template in parsed.ifilter_templates():
+            if template.name == 'main':
+                if '_' in template.get('1'):
+                    return False
+        return True
+
+    @staticmethod
+    def no_redirect_underscores(parsed):
+        if not parsed.upper().startswith('#REDIRECT'):
+            return True #it's not a redirect, it passes the test
+        return StyleGuide.no_link_underscores(parsed)
+
+    @staticmethod
+    def redirect_category_newline(parsed):
+        if not parsed.upper().startswith('#REDIRECT'):
+            return True #it's not a redirect, it passes the test
+        links = parsed.filter_wikilinks()
+        if not parsed.get(parsed.index(links[1]) - 1).endswith('\n'):
+            return False
+        return True
+
+    @staticmethod
+    def no_redir_section_underscores(parsed):
+        if not parsed.upper().startswith('#REDIRECT'):
+            return True #it's not a redirect, it passes the test
+        return StyleGuide.no_section_underscores(parsed)
+
+    @staticmethod
+    def whitespace_headings(parsed):
+        parsed = StyleGuide._remove_ignore(parsed)
+        for heading in parsed.ifilter_headings():
+            if not parsed.get(parsed.index(heading) - 1).endswith('\n\n'):
+                return False
+        return True
+
+    @staticmethod
+    def no_nih_space(parsed):
+        parsed = StyleGuide._remove_ignore(parsed)
+        return not bool(re.search('^; .*', str(parsed), re.M))
+
+    @staticmethod
+    def whitespace_ul(parsed):
+        parsed = StyleGuide._remove_ignore(parsed)
+        if re.search(r'^[\*:]*\*[^ ]', str(parsed), re.M):
+            return False
+        if re.search(r'^:+\*+', str(parsed), re.M):
+            return False
+        return True
+
+    @staticmethod
+    def whitespace_ol(parsed):
+        parsed = StyleGuide._remove_ignore(parsed)
+        if re.search(r'^[#:]*#[^ ]', str(parsed), re.M):
+            return False
+        if re.search(r'^:+#+', str(parsed), re.M):
+            return False
+        return True
+
+    @staticmethod
+    def no_indent_space(parsed):
+        parsed = StyleGuide._remove_ignore(parsed)
+        return not bool(re.search('^: [^\*#:;]?.*', str(parsed), re.M))
+
+    @staticmethod
+    def ref_punctuation(parsed):
+        parsed = StyleGuide._remove_ignore(parsed)
+        return not bool(re.search(r' <ref', str(parsed)))
+
+    @staticmethod
+    def no_spaces_inside_tags(parsed):
+        for tag in parsed.ifilter_tags():
+            if tag.contents is None:
+                continue
+            if tag.contents.startswith(' ') or tag.contents.endswith(' '):
+                return False
+        return True
+
+    @staticmethod
+    def no_hr_whitespace(parsed):
+        parsed = StyleGuide._remove_ignore(parsed)
+        return '\n\n----\n\n' not in str(parsed)
+
+    @staticmethod
+    def no_space_pre(parsed):
+        parsed = StyleGuide._remove_ignore(parsed)
+        return not bool(re.search('^ .*', str(parsed), re.M))
+
+    @staticmethod
+    def no_pre_space(parsed):
+        for tag in parsed.ifilter_tags():
+            if tag.tag == 'pre' and (tag.contents.startswith('\n')
+                                     or tag.contents.endswith('\n')):
+                return False
+        return True
 
 #login
 print('Logging in...')
@@ -200,7 +378,7 @@ The process is:
     for rev in pageob.revisions(rvprop='content|ids|timestamp'): #for every revision
         print('   Revision ID', rev.revid)
         processed.append(rev)
-        parsedcontents = mwp.parse(rev.__dict__['*'], 0, True) #hack
+        parsedcontents = mwp.parse(rev.content, 0, True)
         has_template = False
         for temp in parsedcontents.ifilter_templates():
             if temp.name.lower() == templatename and not temp.has('date'):
@@ -256,7 +434,7 @@ print(' Requested random pages.')
 for page in pages:
     print('Page', page)
     content = page.read()
-    parsed = mwp.parse(content, 0, True)
+    parsed = mwp.parse(content)
     ignore = []
     for template in parsed.ifilter_templates():
         if template.name.lower() == CONFIG['arbit'][3].lower():
@@ -269,15 +447,15 @@ for page in pages:
             break
     if go_on:
         bads = []
-        for k, v in CONFIG['styles'].items():
+        for k in StyleGuide.__dict__.keys():
+            if k.startswith('_'):
+                continue
+            k = k.replace('_', '-')
             if k not in ignore:
-                match = (not re.search(v['*'], content)
-                         if v['negate'] else re.search(v['*'], content)
-                         and not re.search('<(?P<spe>scratchblocks|pre)>.*?'
-                                           + v['*'] + '.*?</(?P=spe)>', content, re.S))
-                if match:
+                passed = getattr(StyleGuide, k.replace('-', '_'), lambda: True)(parsed)
+                if not passed:
                     print(' Found flaw:', k)
-                    bads.append(k)
+                    bads.append(k.replace('_', '-'))
         if bads:
             insert = '{{' + CONFIG['arbit'][2] + '\n|' + '\n|'.join(bads) \
                      + '\n|date={{subst:CURRENTMONTHNAME}} {{subst:CURRENTYEAR}}\n}}\n'
@@ -300,7 +478,7 @@ for page in pages:
         else:
             print('Page', page, 'was not edited - no broken guidelines found.')
     else:
-        print(' {{NoBots}} or {{bad style}} in page, skipping.')
+        print(' {{NoBots}}, {{disambig}}, {{faq}}, or {{bad style}} in page, skipping.')
 
 #raise SystemExit #uncomment this to stop here
 
