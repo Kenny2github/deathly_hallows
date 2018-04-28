@@ -4,9 +4,9 @@ import os
 import time
 import re
 import pickle
-import mw_api_client as mwc
 import mwparserfromhell as mwp
 import easygui as e
+import mw_api_client as mwc
 
 #setup
 print('Loading login data...')
@@ -28,8 +28,8 @@ if '--refresh-config' in sys.argv or 'config.pickle' not in os.listdir('.'):
     gen = [cm for cm in gen if not cm.title.endswith('/doc')] #no documentations
     templates = gen[:]
     for temp_ in gen: #for every template
-        links = temp_.backlinks(blfilterredir='redirects', blnamespace=10) #get template redirects
-        templates.extend(links) #list.extend is so cool
+        _links = temp_.backlinks(blfilterredir='redirects', blnamespace=10) #get template redirects
+        templates.extend(_links) #list.extend is so cool
     templates = [temp.title.replace('Template:',
                                     '(?:Template:)?') for temp in templates]
     CONFIG['templates'] = '|'.join(templates) #join into one alternative
@@ -39,7 +39,7 @@ if '--refresh-config' in sys.argv or 'config.pickle' not in os.listdir('.'):
                                 .revisions(1))[0].comment
     print(' Loaded config: template date format')
     CONFIG['cncount'] = int(list(sw.page(f'User:{USERNAME}/Config/InaccurateCnCount')
-                             .revisions(1))[0].comment)
+                                 .revisions(1))[0].comment)
     print(' Loaded config: inaccurate {{cn}} count')
     contents = sw.page(f'User:{USERNAME}/Config/FirstAndSecondPersonWords').read()
     CONFIG['words'] = re.search('<pre>(.*)</pre>',
@@ -63,7 +63,9 @@ else:
         print(' Loaded config: everything')
 print('Loaded config.')
 
-class StyleGuide(object): #style guide rules
+class StyleGuide(object): #pylint: disable=too-many-public-methods
+    """Style guide rules"""
+    #pylint: disable=missing-docstring
     @staticmethod
     def _remove_ignore(parsed):
         parsed = mwp.parse(str(parsed))
@@ -76,8 +78,7 @@ class StyleGuide(object): #style guide rules
     def no_spaces_inside_apos(parsed):
         parsed = StyleGuide._remove_ignore(parsed)
         for thing in parsed.ifilter(
-            matches=lambda n: getattr(n, 'tag', None) in ('i', 'b')
-        ):
+                matches=lambda n: getattr(n, 'tag', None) in ('i', 'b')):
             if getattr(thing, 'contents', '').startswith(' ') \
                    or getattr(thing, 'contents', '').endswith(' '):
                 return False
@@ -213,12 +214,12 @@ class StyleGuide(object): #style guide rules
     @staticmethod
     def no_indent_space(parsed):
         parsed = StyleGuide._remove_ignore(parsed)
-        return not bool(re.search('^: [^\*#:;]?.*', str(parsed), re.M))
+        return not bool(re.search(r'^: [^\*#:;]?.*', str(parsed), re.M))
 
     @staticmethod
     def ref_punctuation(parsed):
         parsed = StyleGuide._remove_ignore(parsed)
-        return not bool(re.search(r' <ref', str(parsed)))
+        return not bool(re.search(' <ref', str(parsed)))
 
     @staticmethod
     def no_spaces_inside_tags(parsed):
@@ -246,11 +247,12 @@ class StyleGuide(object): #style guide rules
                                      or tag.contents.endswith('\n')):
                 return False
         return True
+    #pylint: enable=missing-docstring
 
 #login
 print('Logging in...')
-result = sw.login(USERNAME, PASSWORD)
-print('Login result:', result['result'])
+loginresult = sw.login(USERNAME, PASSWORD)
+print('Login result:', loginresult['result'])
 
 def submitedit(pageobj_, contents_, summ):
     """Submit edit function"""
@@ -398,11 +400,11 @@ cms = sw.category(CONFIG['arbit'][1]).categorymembers()
 for page in cms: #for every title
     print('Page', page.title)
     content = page.read()
-    parsed = mwp.parse(content, 0, True)
+    parsed_content = mwp.parse(content, 0, True)
     #nobots check
     go_on = True
-    for template in parsed.ifilter_templates():
-        if template.name.lower() == 'nobots':
+    for umtemplate in parsed_content.ifilter_templates():
+        if umtemplate.name.lower() == 'nobots':
             go_on = False
             break
     if not go_on:
@@ -410,14 +412,14 @@ for page in cms: #for every title
         continue
     #add dates! :)
     go_on = False
-    for template in parsed.ifilter_templates():
-        if re.search(CONFIG['templates'], str(template.name), re.I) \
-                and not template.has('date'):
-            template.add('date', get_date(page, template.name))
+    for datedtemplate in parsed_content.ifilter_templates():
+        if re.search(CONFIG['templates'], str(datedtemplate.name), re.I) \
+                and not datedtemplate.has('date'):
+            datedtemplate.add('date', get_date(page, datedtemplate.name))
             go_on = True #at least one template was changed
     if go_on:         #if ^
         print("Edit on page", page.title + ":",
-              submitedit(page, str(parsed),
+              submitedit(page, str(parsed_content),
                          'Automated edit: added dates to templates')) #submit the edit!
     else:
         print("Page", page.title, "was not edited.") #no change
@@ -434,39 +436,42 @@ print(' Requested random pages.')
 for page in pages:
     print('Page', page)
     content = page.read()
-    parsed = mwp.parse(content)
+    parsed_content = mwp.parse(content)
     ignore = []
-    for template in parsed.ifilter_templates():
-        if template.name.lower() == CONFIG['arbit'][3].lower():
-            ignore = template.params
+    for good_style in parsed_content.ifilter_templates():
+        if good_style.name.lower() == CONFIG['arbit'][3].lower():
+            ignore = good_style.params
             break
     go_on = True
-    for template in parsed.ifilter_templates():
-        if template.name.lower() in (CONFIG['arbit'][2].lower(), 'nobots', 'disambig', 'faq'):
+    for warntemplate in parsed_content.ifilter_templates():
+        if warntemplate.name.lower() in (CONFIG['arbit'][2].lower(), 'nobots', 'disambig', 'faq'):
             go_on = False
             break
     if go_on:
         bads = []
-        for k in StyleGuide.__dict__.keys():
+        for k in StyleGuide.__dict__:
             if k.startswith('_'):
                 continue
             k = k.replace('_', '-')
             if k not in ignore:
-                passed = getattr(StyleGuide, k.replace('-', '_'), lambda: True)(parsed)
+                passed = getattr(StyleGuide, k.replace('-', '_'),
+                                 lambda: True)(parsed_content)
                 if not passed:
                     print(' Found flaw:', k)
-                    bads.append(k.replace('_', '-'))
+                    bads.append(k)
         if bads:
             insert = '{{' + CONFIG['arbit'][2] + '\n|' + '\n|'.join(bads) \
                      + '\n|date={{subst:CURRENTMONTHNAME}} {{subst:CURRENTYEAR}}\n}}\n'
-            links = parsed.filter_wikilinks()
-            links = list(filter(lambda link: re.match(r'(Category|[a-z][a-z]([a-z]|-[a-z]+)?):.*',
-                                                      str(link.title), re.I), links))
+            wikilinks = parsed_content.filter_wikilinks()
+            wikilinks = list(filter(
+                lambda link: re.match(r'(Category|[a-z][a-z]([a-z]|-[a-z]+)?):.*',
+                                      str(link.title), re.I), wikilinks
+            ))
             try:
-                parsed.insert_before(links[0], insert)
+                parsed_content.insert_before(wikilinks[0], insert)
             except (ValueError, IndexError):
-                parsed.append(insert)
-            content = str(parsed)
+                parsed_content.append(insert)
+            content = str(parsed_content)
             print('Edit on page', page.title + ':', submitedit(
                 page,
                 content,
@@ -522,10 +527,10 @@ try:
                     print(' In userspace, skipping.')
                     continue #skip the entire page
                 content = pageobj.read()
-                parsed = mwp.parse(content, 0, True)
+                parsed_content = mwp.parse(content, 0, True)
                 go_on = True
-                for template in parsed.ifilter_templates():
-                    if template.name.lower() == 'nobots':
+                for warntemplate in parsed_content.ifilter_templates():
+                    if warntemplate.name.lower() == 'nobots':
                         go_on = False
                         break
                 if not go_on:
@@ -535,10 +540,10 @@ try:
                 #all pages with dateless templates have had their dates added now
                 detected = 0
                 inaccurate_already = False
-                for template in parsed.ifilter_templates():
-                    if template.name.lower() in ('cn', 'citation needed'):
+                for cntemplate in parsed_content.ifilter_templates():
+                    if cntemplate.name.lower() in ('cn', 'citation needed'):
                         detected += 1
-                    elif template.name.lower() == 'inaccurate':
+                    elif cntemplate.name.lower() == 'inaccurate':
                         inaccurate_already = True
                 if detected > CONFIG['cncount'] and not inaccurate_already:
                     content = '{{inaccurate|date={{subst:CURRENTMONTHNAME}} ' \
