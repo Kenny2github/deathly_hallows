@@ -289,12 +289,12 @@ if limit: #if limit != 0
         exp = re.compile(r'(\s|(?=[ -~])\W)(?=[a-zA-Z\']+)('
                          + CONFIG['words'] + r')((?=[ -~])\W)', re.I)
         if re.search(exp, content): #if there's a match
-            content = re.sub(exp, r'\1\u2588\2\u2588\3', content) #highlight every instance
+            content = re.sub(exp, '\\1\u2588\\2\u2588\\3', content) #highlight every instance
             try:
                 content = e.codebox('Modify content below - first and second person '
                                     'are highlighted in \u2588s. Press Cancel '
                                     'or leave blank to cancel.',
-                                    'Modify Content of ' + page, content).strip() or None
+                                    'Modify Content of ' + page.title, content).strip() or None
             except AttributeError:
                 content = None
             if content is not None: #if it's not None
@@ -336,16 +336,16 @@ if limit: #if limit != 0
         content = page.read()
         if re.search('<references */>', content, re.I):
             content = re.sub(r'((?!<ref>{}</ref>)(?:<ref>.*?</ref>))'.format(CONFIG['refformat']),
-                             r'\u2588\1\u2588', content) #monster regex to highlight every instance
+                             '\u2588\\1\u2588', content) #monster regex to highlight every instance
             try:
-                content = e.codebox(u'Modify content below - bad references '
+                content = e.codebox('Modify content below - bad references '
                                     'are highlighted in \u2588s. Press Cancel '
                                     'or leave blank to cancel.',
-                                    'Modify Content of ' + page, content).strip() or None
+                                    'Modify Content of ' + page.title, content).strip() or None
             except AttributeError:
                 content = None
             if content is not None: #if it's not None
-                content = content.replace(u'\u2588', '') #remove all highlights
+                content = content.replace('\u2588', '') #remove all highlights
                 print('Edit on page', page.title + ':',
                       submitedit(page,
                                  content,
