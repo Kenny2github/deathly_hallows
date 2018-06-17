@@ -3,8 +3,7 @@ import sys
 import os
 import time
 import re
-from urllib import unquote
-from urllib.parse import urlparse
+from urllib.parse import urlparse, unquote
 import pickle
 import mwparserfromhell as mwp
 import easygui as e
