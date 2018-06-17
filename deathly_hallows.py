@@ -3,12 +3,14 @@ import sys
 import os
 import time
 import re
+from urllib import unquote
+from urllib.parse import urlparse
 import pickle
 import mwparserfromhell as mwp
 import easygui as e
 import mw_api_client as mwc
 
-#protect against importion
+#protect against importing
 if __name__ != '__main__':
     raise RuntimeError('This module cannot be imported!')
 
@@ -99,6 +101,31 @@ class StyleGuide(object): #pylint: disable=too-many-public-methods
     def fix_no_link_underscores(parsed):
         for link in parsed.ifilter_wikilinks():
             link.title = str(link.title).replace('_', ' ')
+
+    @staticmethod
+    def no_ext_wikilinks(parsed):
+        for link in parsed.ifilter_external_links():
+            if re.match(r'https?://en\.scratch-wiki\.info',
+                        str(link.url), re.I):
+                return False
+        return True
+
+    @staticmethod
+    def fix_no_ext_wikilinks(parsed):
+        links = parsed.filter_external_links()
+        for link in links:
+            if re.match(r'https?://en\.scratch-wiki\.info',
+                        str(link.url), re.I):
+                url = urlparse(str(link.url))
+                letitle = url.path.rsplit('/', 1)[1]
+                letitle = unquote(letitle).replace('_', ' ')
+                if link.title:
+                    newlink = '[[{}|{}]]'.format(
+                        letitle, link.title
+                    )
+                else:
+                    newlink = '[[{}]]'.format(letitle)
+                parsed.replace(link, newlink)
 
     @staticmethod
     def no_section_underscores(parsed):
