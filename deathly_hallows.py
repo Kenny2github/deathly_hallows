@@ -100,6 +100,7 @@ class StyleGuide(object): #pylint: disable=too-many-public-methods
     def fix_no_link_underscores(parsed):
         for link in parsed.ifilter_wikilinks():
             link.title = str(link.title).replace('_', ' ')
+        return parsed
 
     @staticmethod
     def no_ext_wikilinks(parsed):
@@ -125,6 +126,7 @@ class StyleGuide(object): #pylint: disable=too-many-public-methods
                 else:
                     newlink = '[[{}]]'.format(letitle)
                 parsed.replace(link, newlink)
+        return parsed
 
     @staticmethod
     def no_section_underscores(parsed):
@@ -147,6 +149,7 @@ class StyleGuide(object): #pylint: disable=too-many-public-methods
                              lambda m: chr(int(m.group(1), 16)),
                              section)
             link.title = title + '#' + section
+        return parsed
 
     @staticmethod
     def no_cat_underscores(parsed):
@@ -157,7 +160,7 @@ class StyleGuide(object): #pylint: disable=too-many-public-methods
 
     @staticmethod
     def fix_no_cat_underscores(parsed):
-        StyleGuide.fix_no_link_underscores(parsed)
+        return StyleGuide.fix_no_link_underscores(parsed)
 
     @staticmethod
     def cat_at_end(parsed):
@@ -191,6 +194,7 @@ class StyleGuide(object): #pylint: disable=too-many-public-methods
         for template in parsed.ifilter_templates():
             if re.match('^[A-Z][^A-Z]+$', str(template.name)):
                 template.name = template.name[0].lower() + template.name[1:]
+        return parsed
 
     @staticmethod
     def pipe_at_line_start(parsed):
@@ -223,6 +227,7 @@ class StyleGuide(object): #pylint: disable=too-many-public-methods
                 template.params[0].value = str(template.params[0].value).replace(
                     '_', ' '
                 )
+        return parsed
 
     @staticmethod
     def no_redirect_underscores(parsed):
@@ -232,7 +237,7 @@ class StyleGuide(object): #pylint: disable=too-many-public-methods
 
     @staticmethod
     def fix_no_redirect_underscores(parsed):
-        StyleGuide.fix_no_link_underscores(parsed)
+        return StyleGuide.fix_no_link_underscores(parsed)
 
     @staticmethod
     def redirect_category_newline(parsed):
@@ -251,7 +256,7 @@ class StyleGuide(object): #pylint: disable=too-many-public-methods
 
     @staticmethod
     def fix_no_redir_section_underscores(parsed):
-        StyleGuide.fix_no_section_underscores(parsed)
+        return StyleGuide.fix_no_section_underscores(parsed)
 
     @staticmethod
     def whitespace_headings(parsed):
@@ -264,14 +269,14 @@ class StyleGuide(object): #pylint: disable=too-many-public-methods
     @staticmethod
     def no_nih_space(parsed):
         parsed = StyleGuide._remove_ignore(parsed)
-        return not bool(re.search('^; .*', str(parsed), re.M))
+        return not bool(re.search('^; ', str(parsed), re.M))
 
     @staticmethod
     def fix_no_nih_space(parsed):
-        objs = parsed.filter()
-        for i, obj in enumerate(objs): #not ifilter because it modifies in-place
-            if getattr(obj, 'tag', 'notdt') == 'dt':
-                parsed.replace(objs[i + 1], objs[i + 1].lstrip())
+        unparsed = str(parsed)
+        unparsed = re.sub('^; ', ';', unparsed, re.M)
+        parsed = mwp.parse(unparsed)
+        return parsed
 
     @staticmethod
     def whitespace_ul(parsed):
@@ -298,10 +303,10 @@ class StyleGuide(object): #pylint: disable=too-many-public-methods
 
     @staticmethod
     def fix_no_indent_space(parsed):
-        objs = parsed.filter()
-        for i, obj in enumerate(objs): #not ifilter because it modifies in-place
-            if getattr(obj, 'tag', 'notdd') == 'dd':
-                parsed.replace(objs[i + 1], objs[i + 1].lstrip())
+        unparsed = str(parsed)
+        unparsed = re.sub('^: ', ':', unparsed, re.M)
+        parsed = mwp.parse(unparsed)
+        return parsed
 
     @staticmethod
     def ref_punctuation(parsed):
@@ -321,6 +326,17 @@ class StyleGuide(object): #pylint: disable=too-many-public-methods
     def no_hr_whitespace(parsed):
         parsed = StyleGuide._remove_ignore(parsed)
         return '\n\n----\n\n' not in str(parsed)
+
+    @staticmethod
+    def no_trailing_spaces(parsed):
+        return not bool(re.search(r'.*\s$', str(parsed), re.M))
+
+    @staticmethod
+    def fix_no_trailing_spaces(parsed):
+        unparsed = str(parsed)
+        unparsed = re.sub('\s+$', '', unparsed, re.M)
+        parsed = mwp.parse(unparsed)
+        return parsed
 
     @staticmethod
     def no_space_pre(parsed):
@@ -596,7 +612,7 @@ if runme('style'):
                         if '--style-fix' in sys.argv and hasattr(
                             StyleGuide, 'fix_' + k.replace('-', '_')
                         ):
-                            getattr(
+                            parsed_content = getattr(
                                 StyleGuide,
                                 'fix_' + k.replace('-', '_')
                             )(parsed_content)
