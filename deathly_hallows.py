@@ -261,10 +261,14 @@ class StyleGuide(object): #pylint: disable=too-many-public-methods
     @staticmethod
     def whitespace_headings(parsed):
         parsed = StyleGuide._remove_ignore(parsed)
-        for heading in parsed.ifilter_headings():
-            if not parsed.get(parsed.index(heading) - 1).endswith('\n\n'):
-                return False
-        return True
+        return not bool(re.search('[^\n=]\n(=+)[^=]+\\1', str(parsed)))
+
+    @staticmethod
+    def fix_whitespace_headings(parsed):
+        unparsed = str(parsed)
+        unparsed = re.sub(r"([^\n])\n(=+)([^=]+)\2", r"\1\n\n\2\3\2", unparsed)
+        parsed = mwp.parse(unparsed)
+        return parsed
 
     @staticmethod
     def no_nih_space(parsed):
@@ -281,20 +285,34 @@ class StyleGuide(object): #pylint: disable=too-many-public-methods
     @staticmethod
     def whitespace_ul(parsed):
         parsed = StyleGuide._remove_ignore(parsed)
-        if re.search(r'(\n|^)[\*:#]*\*[^ ]', str(parsed)):
+        if re.search(r'(\n|^)[\*:#]*\*[^ *]', str(parsed)):
             return False
         if re.search(r'(\n|^):+\*+', str(parsed)):
             return False
         return True
 
     @staticmethod
+    def fix_whitespace_ul(parsed):
+        unparsed = str(parsed)
+        unparsed = re.sub(r'(\n|^)([\*:#]*\*)([^ *])', r'\1\2 \3', unparsed)
+        parsed = mwp.parse(unparsed)
+        return parsed
+
+    @staticmethod
     def whitespace_ol(parsed):
         parsed = StyleGuide._remove_ignore(parsed)
-        if re.search(r'(\n|^)[\*#:]*#[^ ]', str(parsed)):
+        if re.search(r'(\n|^)[\*#:]*#[^ #]', str(parsed)):
             return False
         if re.search(r'(\n|^):+#+', str(parsed)):
             return False
         return True
+
+    @staticmethod
+    def fix_whitespace_ol(parsed):
+        unparsed = str(parsed)
+        unparsed = re.sub(r'(\n|^)([\*#:]*#)([^ #])', r'\1\2 \3', unparsed)
+        parsed = mwp.parse(unparsed)
+        return parsed
 
     @staticmethod
     def no_indent_space(parsed):
@@ -356,6 +374,7 @@ class StyleGuide(object): #pylint: disable=too-many-public-methods
         for tag in parsed.ifilter_tags():
             if tag.tag == 'pre':
                 tag.contents = tag.contents.strip('\n')
+        return parsed
     #pylint: enable=missing-docstring
 
 def runme(name):
@@ -367,8 +386,8 @@ def runme(name):
 
 #login
 print('Logging in...')
-loginresult = sw.login(USERNAME, PASSWORD)
-print('Login result:', loginresult['result'])
+loginresult = sw.clientlogin(USERNAME, PASSWORD)
+print('Login result:', loginresult['status'])
 
 def submitedit(pageobj_, contents_, summ):
     """Submit edit function"""
@@ -612,7 +631,7 @@ if runme('style'):
                     passed = getattr(StyleGuide, k.replace('-', '_'),
                                      lambda *_: True)(parsed_content)
                     if not passed:
-                        if '--style-fix' in sys.argv and hasattr(
+                        if '--no-style-fix' not in sys.argv and hasattr(
                                 StyleGuide, 'fix_' + k.replace('-', '_')):
                             parsed_content = getattr(
                                 StyleGuide,
@@ -620,7 +639,7 @@ if runme('style'):
                             )(parsed_content)
                             fixed += 1
                             print(' Fixed flaw:', k)
-                        else:
+                        elif '--no-style-template' not in sys.argv:
                             print(' Found flaw:', k)
                             bads.append(k)
             if bads:
@@ -637,14 +656,28 @@ if runme('style'):
                     parsed_content.append(insert)
             if bads or fixed:
                 content = str(parsed_content)
+                if bads and not fixed:
+                    comment = 'Automated edit: added {} ({} guideline{} broken)'.format(
+                        '{{[[Template:%s|%s]]}}' % ((CONFIG['arbit'][2],) * 2),
+                        len(bads),
+                        '' if len(bads) == 1 else 's'
+                    )
+                elif fixed and not bads:
+                    comment = 'Automated edit: fixed {} style guideline{}'.format(
+                        fixed,
+                        '' if fixed == 1 else 's'
+                    )
+                else:
+                    comment = 'Automated edit: added {} ({} guideline{} broken) ({} fixed)'.format(
+                        '{{[[Template:%s|%s]]}}' % ((CONFIG['arbit'][2],) * 2),
+                        len(bads),
+                        '' if len(bads) == 1 else 's',
+                        fixed
+                    )
                 print('Edit on page', page.title + ':', submitedit(
                     page,
                     content,
-                    'Automated edit: added {} ({} guidelines broken){}'.format(
-                        '{{[[Template:' + CONFIG['arbit'][2] + '|' + CONFIG['arbit'][2] + ']]}}',
-                        len(bads),
-                        ' ({} fixed)'.format(fixed) if fixed > 0 else ''
-                    )
+                    comment
                 ))
             else:
                 print('Page', page, 'was not edited - no broken guidelines found.')
