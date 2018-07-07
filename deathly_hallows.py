@@ -269,42 +269,42 @@ class StyleGuide(object): #pylint: disable=too-many-public-methods
     @staticmethod
     def no_nih_space(parsed):
         parsed = StyleGuide._remove_ignore(parsed)
-        return not bool(re.search('^; ', str(parsed), re.M))
+        return not bool(re.search('(\n|^); ', str(parsed)))
 
     @staticmethod
     def fix_no_nih_space(parsed):
         unparsed = str(parsed)
-        unparsed = re.sub('^; ', ';', unparsed, re.M)
+        unparsed = re.sub('(\n|^); ', r'\1;', str(parsed))
         parsed = mwp.parse(unparsed)
         return parsed
 
     @staticmethod
     def whitespace_ul(parsed):
         parsed = StyleGuide._remove_ignore(parsed)
-        if re.search(r'^[\*:]*\*[^ ]', str(parsed), re.M):
+        if re.search(r'(\n|^)[\*:#]*\*[^ ]', str(parsed)):
             return False
-        if re.search(r'^:+\*+', str(parsed), re.M):
+        if re.search(r'(\n|^):+\*+', str(parsed)):
             return False
         return True
 
     @staticmethod
     def whitespace_ol(parsed):
         parsed = StyleGuide._remove_ignore(parsed)
-        if re.search(r'^[#:]*#[^ ]', str(parsed), re.M):
+        if re.search(r'(\n|^)[\*#:]*#[^ ]', str(parsed)):
             return False
-        if re.search(r'^:+#+', str(parsed), re.M):
+        if re.search(r'(\n|^):+#+', str(parsed)):
             return False
         return True
 
     @staticmethod
     def no_indent_space(parsed):
         parsed = StyleGuide._remove_ignore(parsed)
-        return not bool(re.search(r'^: [^\*#:;]?.*', str(parsed), re.M))
+        return not bool(re.search(r'(\n|^):+ (?![\*#:;].*)(.*)', str(parsed)))
 
     @staticmethod
     def fix_no_indent_space(parsed):
         unparsed = str(parsed)
-        unparsed = re.sub('^: ', ':', unparsed, re.M)
+        unparsed = re.sub(r'(\n|^)(:+) (?![\*#:;].*)(.*)', r'\1\2\3', unparsed)
         parsed = mwp.parse(unparsed)
         return parsed
 
@@ -329,19 +329,19 @@ class StyleGuide(object): #pylint: disable=too-many-public-methods
 
     @staticmethod
     def no_trailing_spaces(parsed):
-        return not bool(re.search(r'.*\s$', str(parsed), re.M))
+        return not bool(re.search('[ \t](\n|$)', str(parsed)))
 
     @staticmethod
     def fix_no_trailing_spaces(parsed):
         unparsed = str(parsed)
-        unparsed = re.sub('\s+$', '', unparsed, re.M)
+        unparsed = re.sub('[ \t]+(\n|$)', r'\1', unparsed)
         parsed = mwp.parse(unparsed)
         return parsed
 
     @staticmethod
     def no_space_pre(parsed):
         parsed = StyleGuide._remove_ignore(parsed)
-        return not bool(re.search('^ .*', str(parsed), re.M))
+        return not bool(re.search('(\n|^) ', str(parsed)))
 
     @staticmethod
     def no_pre_space(parsed):
@@ -373,7 +373,8 @@ print('Login result:', loginresult['result'])
 def submitedit(pageobj_, contents_, summ):
     """Submit edit function"""
     if '--confirmedit' in sys.argv:
-        confirm = e.codebox(f'Confirm edit on {page}', 'Confirm Edit', contents_)
+        confirm = e.codebox(f'Confirm edit on {pageobj_.title}',
+                            'Confirm Edit', contents_)
         if confirm is None or not confirm.strip():
             return 'Cancelled'
     result = pageobj_.edit(contents_, summ, nocreate=1)
@@ -459,8 +460,9 @@ if runme('references'):
         for page in pages: #for every page
             content = page.read()
             if re.search('<references */>', content, re.I):
-                content = re.sub(r'((?!<ref>{}</ref>)(?:<ref>.*?</ref>))'.format(CONFIG['refformat']),
-                                 '\u2588\\1\u2588', content) #monster regex to highlight every instance
+                content = re.sub(r'((?!<ref>{}</ref>)(?:<ref>.*?</ref>))'
+                                 .format(CONFIG['refformat']),
+                                 '\u2588\\1\u2588', content)
                 try:
                     content = e.codebox('Modify content below - bad references '
                                         'are highlighted in \u2588s. Press Cancel '
@@ -595,7 +597,8 @@ if runme('style'):
                 break
         go_on = True
         for warntemplate in parsed_content.ifilter_templates():
-            if warntemplate.name.lower() in (CONFIG['arbit'][2].lower(), 'nobots', 'disambig', 'faq'):
+            if warntemplate.name.lower() in (CONFIG['arbit'][2].lower(),
+                                             'nobots', 'disambig', 'faq'):
                 go_on = False
                 break
         if go_on:
@@ -610,8 +613,7 @@ if runme('style'):
                                      lambda *_: True)(parsed_content)
                     if not passed:
                         if '--style-fix' in sys.argv and hasattr(
-                            StyleGuide, 'fix_' + k.replace('-', '_')
-                        ):
+                                StyleGuide, 'fix_' + k.replace('-', '_')):
                             parsed_content = getattr(
                                 StyleGuide,
                                 'fix_' + k.replace('-', '_')
@@ -621,7 +623,7 @@ if runme('style'):
                         else:
                             print(' Found flaw:', k)
                             bads.append(k)
-            if bads or fixed:
+            if bads:
                 insert = '{{' + CONFIG['arbit'][2] + '\n|' + '\n|'.join(bads) \
                          + '\n|date={{subst:CURRENTMONTHNAME}} {{subst:CURRENTYEAR}}\n}}\n'
                 wikilinks = parsed_content.filter_wikilinks()
@@ -633,6 +635,7 @@ if runme('style'):
                     parsed_content.insert_before(wikilinks[0], insert)
                 except (ValueError, IndexError):
                     parsed_content.append(insert)
+            if bads or fixed:
                 content = str(parsed_content)
                 print('Edit on page', page.title + ':', submitedit(
                     page,
@@ -677,8 +680,10 @@ if runme('cn'):
 
     if '--page' not in sys.argv:
         eis = [] #empty list for now
-        eis.extend([ei.title for ei in sw.template('citation needed').transclusions(namespace='0|4|12')])
-        eis.extend([ei.title for ei in sw.template('cn').transclusions(namespace='0|4|12')])
+        eis.extend([ei.title for ei in sw.template('citation needed')
+                    .transclusions(namespace='0|4|12')])
+        eis.extend([ei.title for ei in sw.template('cn')
+                    .transclusions(namespace='0|4|12')])
         for ei in sw.template('inaccurate').transclusions(): #for every embeddedin
             if ei.title in eis:
                 eis.remove(ei.title)
