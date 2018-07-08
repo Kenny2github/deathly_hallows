@@ -384,6 +384,12 @@ def runme(name):
     idx = sys.argv.index('--only')
     return name in sys.argv[idx + 1].split(',')
 
+def sleeptime():
+    """Find out how long to sleep for."""
+    if '--sleep' in sys.argv:
+        return int(sys.argv[sys.argv.index('--sleep') + 1])
+    return 1
+
 #login
 print('Logging in...')
 loginresult = sw.clientlogin(USERNAME, PASSWORD)
@@ -571,7 +577,7 @@ if runme('dates'):
                              'Automated edit: added dates to templates')) #submit the edit!
         else:
             print("Page", page.title, "was not edited.") #no change
-        time.sleep(1)
+        time.sleep(sleeptime())
 
 #raise SystemExit #uncomment this to stop here
 
@@ -683,6 +689,7 @@ if runme('style'):
                 print('Page', page, 'was not edited - no broken guidelines found.')
         else:
             print(' {{NoBots}}, {{disambig}}, {{faq}}, or {{bad style}} in page, skipping.')
+        time.sleep(sleeptime())
 
 #raise SystemExit #uncomment this to stop here
 
