@@ -57,6 +57,9 @@ if '--refresh-config' in sys.argv or 'config.pickle' not in os.listdir('.'):
     CONFIG['styletags'] = list(sw.page(f'User:{USERNAME}/Config/BadStyleIgnoreTags')
                                .revisions(1))[0].comment.split('|')
     print(' Loaded config: bad style ignore tags')
+    CONFIG['tagswithspaces'] = list(sw.page(f'User:{USERNAME}/Config/TagsWithSpaces')
+                                    .revisions(1))[0].comment.split('|')
+    print(' Loaded config: tags with spaces')
     print(' Pickling config...')
     with open('config.pickle', 'wb') as config:
         pickle.dump(CONFIG, config, -1)
@@ -335,6 +338,8 @@ class StyleGuide(object): #pylint: disable=too-many-public-methods
     def no_spaces_inside_tags(parsed):
         for tag in parsed.ifilter_tags():
             if tag.contents is None:
+                continue
+            if str(tag.tag) in CONFIG['tagswithspaces']:
                 continue
             if tag.contents.startswith(' ') or tag.contents.endswith(' '):
                 return False
@@ -649,7 +654,7 @@ if runme('style'):
                             print(' Found flaw:', k)
                             bads.append(k)
             if bads:
-                insert = '{{' + CONFIG['arbit'][2] + '\n|' + '\n|'.join(bads) \
+                insert = '\n{{' + CONFIG['arbit'][2] + '\n|' + '\n|'.join(bads) \
                          + '\n|date={{subst:CURRENTMONTHNAME}} {{subst:CURRENTYEAR}}\n}}\n'
                 wikilinks = parsed_content.filter_wikilinks()
                 wikilinks = list(filter(
