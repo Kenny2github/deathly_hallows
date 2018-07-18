@@ -33,7 +33,7 @@ if '--refresh-config' in sys.argv or 'config.pickle' not in os.listdir('.'):
     gen = [cm for cm in gen if not cm.title.endswith('/doc')] #no documentations
     templates = gen[:]
     for temp_ in gen: #for every template
-        _links = temp_.backlinks(blfilterredir='redirects', blnamespace=10) #get template redirects
+        _links = temp_.redirects(namespace=10) #get template redirects
         templates.extend(_links) #list.extend is so cool
     templates = [temp.title.replace('Template:',
                                     '(?:Template:)?') for temp in templates]
@@ -201,9 +201,14 @@ class StyleGuide(object): #pylint: disable=too-many-public-methods
 
     @staticmethod
     def pipe_at_line_start(parsed):
+        multilined = False
         for template in parsed.ifilter_templates():
+            if template.name.endswith('\n'):
+                multilined = True
             for param in template.params:
-                if param.startswith('\n'):
+                if not multilined and param.startswith('\n'):
+                    return False
+                elif multilined and not param.endswith('\n'):
                     return False
         return True
 
