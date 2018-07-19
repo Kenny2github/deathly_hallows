@@ -85,11 +85,11 @@ class StyleGuide(object): #pylint: disable=too-many-public-methods
     @staticmethod
     def no_spaces_inside_apos(parsed):
         parsed = StyleGuide._remove_ignore(parsed)
-        for thing in parsed.ifilter(
-                matches=lambda n: getattr(n, 'tag', None) in ('i', 'b')):
-            if getattr(thing, 'contents', '').startswith(' ') \
-                   or getattr(thing, 'contents', '').endswith(' '):
-                return False
+        for thing in parsed.ifilter(matches=lambda n:
+                                    getattr(n, 'tag', None) in ('i', 'b')):
+            if hasattr(thing, 'contents'):
+                if str(thing.contents).strip() != str(thing.contents):
+                    return False
         return True
 
     @staticmethod
@@ -172,6 +172,8 @@ class StyleGuide(object): #pylint: disable=too-many-public-methods
         links = list(l for l in links
                      if not re.match('^[a-z][a-z](-[a-z]+|[a-z])?:',
                                      str(l.title)))
+        if not links:
+            return False #no links at all??
         if not links[-1].title.startswith('Category:'):
             return False #not even the last non-interwikilink is a category link
         nodes = list(n for n in parsed.nodes
@@ -201,8 +203,8 @@ class StyleGuide(object): #pylint: disable=too-many-public-methods
 
     @staticmethod
     def pipe_at_line_start(parsed):
-        multilined = False
         for template in parsed.ifilter_templates():
+            multilined = False
             if template.name.endswith('\n'):
                 multilined = True
             for param in template.params:
@@ -344,7 +346,8 @@ class StyleGuide(object): #pylint: disable=too-many-public-methods
         for tag in parsed.ifilter_tags():
             if tag.contents is None:
                 continue
-            if str(tag.tag) in CONFIG['tagswithspaces']:
+            # b and i are taken care of by apos
+            if str(tag.tag) in (CONFIG['tagswithspaces'] + ['b', 'i']):
                 continue
             if tag.contents.startswith(' ') or tag.contents.endswith(' '):
                 return False
