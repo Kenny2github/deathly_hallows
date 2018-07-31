@@ -390,8 +390,12 @@ class StyleGuide(object): #pylint: disable=too-many-public-methods
         return parsed
     #pylint: enable=missing-docstring
 
-def runme(name):
+def runme(name, semiauto=False):
     """Check if this section should run."""
+    if '--fully-automatic' in sys.argv and semiauto:
+        return False
+    if '--semi-automatic' in sys.argv and not semiauto:
+        return False
     if '--only' not in sys.argv:
         return True
     idx = sys.argv.index('--only')
@@ -433,7 +437,7 @@ def submitedit(pageobj_, contents_, summ):
 #     5. submits the edit.
 
 
-if runme('depersonifying'):
+if runme('depersonifying', True):
     limit = int(input('Press Enter to skip de-personifying, or a number '
                       '(then Enter) to do it on that amount of pages: ') or '0')
     if limit: #if limit != 0
@@ -485,7 +489,7 @@ if runme('depersonifying'):
 #     5. submits the edit.
 
 
-if runme('references'):
+if runme('references', True):
     limit = int(input('Press Enter to skip reference updating, '
                       'or a number (then Enter) to do it on that amount of pages: ') or '0')
     if limit: #if limit != 0
@@ -593,6 +597,67 @@ if runme('dates'):
         time.sleep(sleeptime())
 
 #raise SystemExit #uncomment this to stop here
+
+if runme('extlinks'):
+    limit = int(input('Enter a number of pages to check for external links, \
+or hit Enter to skip: ') or 0)
+    if limit: #if limit != 0
+        templates = [CONFIG['arbit'][4]]
+        for page in sw.template(templates[0]).redirects():
+            templates.append(page.title[9:])
+        print(templates)
+        pages = [] #no pages yet
+        print(' Requesting random pages...')
+        pages = (sw.random(limit=limit, namespace=0)
+                 if '--page' not in sys.argv
+                 else (sw.page(sys.argv[sys.argv.index('--page') + 1]),))
+        print(' Requested random pages.')
+        for page in pages: #for every page
+            print('Page {}'.format(page.title))
+            content = page.read()
+            parsed = mwp.parse(content)
+            exttemp = None
+            for template in parsed.ifilter_templates():
+                print(template)
+                name = str(template.name)
+                name = name[0].upper() + name[1:]
+                if re.fullmatch('([Tt]emplate:)?({})'
+                                .format('|'.join(templates)),
+                                name):
+                    exttemp = template
+                    break
+            extlinkq = False
+            for link in parsed.ifilter_external_links():
+                print(link)
+                parsed_url = urlparse(str(link.url))
+                if not parsed_url.netloc.endswith((
+                        'en.scratch-wiki.info',
+                        'scratch.mit.edu',
+                        'scratcharchive.asun.co',
+                        'github.com',
+                        'wikipedia.org',
+                )):
+                    extlinkq = True
+                    break
+            summary = 'Automated edit: '
+            if exttemp is None and extlinkq:
+                content = '{{{{{}}}}}'.format(CONFIG['arbit'][4]) + content
+                summary += 'Added {{{{[[Template:{0}|{0}]]}}}}'.format(
+                    CONFIG['arbit'][4]
+                )
+            elif exttemp and not extlinkq:
+                parsed.remove(exttemp)
+                content = str(parsed)
+                summary += 'Removed {{{{[[Template:{0}|{0}]]}}}}'.format(
+                    CONFIG['arbit'][4]
+                )
+            else:
+                print('Not edited.')
+                continue
+            print('Edit: {}'.format(submitedit(page, content, summary)))
+            time.sleep(sleeptime())
+    else:
+        del limit
 
 # This section is the {{bad style}} adding section.
 # It asks for user input as to how many pages to check style for,
