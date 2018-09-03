@@ -60,6 +60,9 @@ if '--refresh-config' in sys.argv or 'config.pickle' not in os.listdir('.'):
     CONFIG['tagswithspaces'] = list(sw.page(f'User:{USERNAME}/Config/TagsWithSpaces')
                                     .revisions(1))[0].comment.split('|')
     print(' Loaded config: tags with spaces')
+    CONFIG['localdomains'] = list(sw.page(f'User:{USERNAME}/Config/LocalExtDomains')
+                                  .revisions(1))[0].comment
+    print(' Loaded config: non-external link domains')
     print(' Pickling config...')
     with open('config.pickle', 'wb') as config:
         pickle.dump(CONFIG, config, -1)
@@ -419,8 +422,18 @@ def submitedit(pageobj_, contents_, summ):
                             'Confirm Edit', contents_)
         if confirm is None or not confirm.strip():
             return 'Cancelled'
-    result = pageobj_.edit(contents_, summ, nocreate=1)
-    return result['edit']['result']
+    try:
+        result = pageobj_.edit(contents_, summ, nocreate=1)
+        return result['edit']['result']
+    except mwc.excs.WikiError as exc:
+        done = (e.codebox('Copy the content below and edit the page yourself '
+                         '- an automatic edit failed.',
+                         'Manual Edit',
+
+                         contents_) or '').lower().startswith('d')
+        if done:
+            return 'Success'
+        return f'Failed ({exc})'
 
 # This section is the de-1st/2nd-personifying section.
 # It asks for user input as to how many pages to depersonify,
@@ -630,13 +643,8 @@ or hit Enter to skip: ') or 0)
             for link in parsed.ifilter_external_links():
                 print(link)
                 parsed_url = urlparse(str(link.url))
-                if not parsed_url.netloc.endswith((
-                        'en.scratch-wiki.info',
-                        'scratch.mit.edu',
-                        'scratcharchive.asun.co',
-                        'github.com',
-                        'wikipedia.org',
-                )):
+                if not re.search(r'(?:.*\.)?(?:' + CONFIG['localdomains'] + ')$',
+                                 parsed_url.netloc, re.I):
                     extlinkq = True
                     break
             summary = 'Automated edit: '
