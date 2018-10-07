@@ -57,6 +57,9 @@ if '--refresh-config' in sys.argv or 'config.pickle' not in os.listdir('.'):
     CONFIG['styletags'] = list(sw.page(f'User:{USERNAME}/Config/BadStyleIgnoreTags')
                                .revisions(1))[0].comment.split('|')
     print(' Loaded config: bad style ignore tags')
+    CONFIG['styletemps'] = list(sw.page(f'User:{USERNAME}/Config/BadStyleIgnoreTemplates')
+                                .revisions(1))[0].comment.split('|')
+    print(' Loaded config: bad style ignore templates')
     CONFIG['tagswithspaces'] = list(sw.page(f'User:{USERNAME}/Config/TagsWithSpaces')
                                     .revisions(1))[0].comment.split('|')
     print(' Loaded config: tags with spaces')
@@ -404,11 +407,10 @@ def runme(name, semiauto=False):
     idx = sys.argv.index('--only')
     return name in sys.argv[idx + 1].split(',')
 
-def sleeptime():
-    """Find out how long to sleep for."""
-    if '--sleep' in sys.argv:
-        return int(sys.argv[sys.argv.index('--sleep') + 1])
-    return 1
+if '--sleep' in sys.argv:
+    sleeptime = int(sys.argv[sys.argv.index('--sleep') + 1])
+else:
+    sleeptime = 1
 
 #login
 print('Logging in...')
@@ -607,7 +609,7 @@ if runme('dates'):
                              'Automated edit: added dates to templates')) #submit the edit!
         else:
             print("Page", page.title, "was not edited.") #no change
-        time.sleep(sleeptime())
+        time.sleep(sleeptime)
 
 #raise SystemExit #uncomment this to stop here
 
@@ -663,7 +665,7 @@ or hit Enter to skip: ') or 0)
                 print('Not edited.')
                 continue
             print('Edit: {}'.format(submitedit(page, content, summary)))
-            time.sleep(sleeptime())
+            time.sleep(sleeptime)
     else:
         del limit
 
@@ -708,8 +710,9 @@ if runme('style'):
                 break
         go_on = True
         for warntemplate in parsed_content.ifilter_templates():
-            if warntemplate.name.lower() in (CONFIG['arbit'][2].lower(),
-                                             'nobots', 'disambig', 'faq'):
+            if warntemplate.name.lower() in (
+                [CONFIG['arbit'][2].lower()] + CONFIG['styletemps']
+            ):
                 go_on = False
                 break
         if go_on:
@@ -774,8 +777,8 @@ if runme('style'):
             else:
                 print('Page', page, 'was not edited - no broken guidelines found.')
         else:
-            print(' {{NoBots}}, {{disambig}}, {{faq}}, or {{bad style}} in page, skipping.')
-        time.sleep(sleeptime())
+            print(' Ignorer template in page, skipping.')
+        time.sleep(sleeptime)
 
 #raise SystemExit #uncomment this to stop here
 
