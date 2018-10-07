@@ -216,7 +216,7 @@ class StyleGuide(object): #pylint: disable=too-many-public-methods
             for param in template.params:
                 if not multilined and param.startswith('\n'):
                     return False
-                elif multilined and not param.endswith('\n'):
+                if multilined and not param.endswith('\n'):
                     return False
         return True
 
@@ -429,10 +429,9 @@ def submitedit(pageobj_, contents_, summ):
         return result['edit']['result']
     except mwc.excs.WikiError as exc:
         done = (e.codebox('Copy the content below and edit the page yourself '
-                         '- an automatic edit failed.',
-                         'Manual Edit',
-
-                         contents_) or '').lower().startswith('d')
+                          '- an automatic edit failed.',
+                          'Manual Edit',
+                          contents_) or '').lower().startswith('d')
         if done:
             return 'Success'
         return f'Failed ({exc})'
@@ -711,7 +710,7 @@ if runme('style'):
         go_on = True
         for warntemplate in parsed_content.ifilter_templates():
             if warntemplate.name.lower() in (
-                [CONFIG['arbit'][2].lower()] + CONFIG['styletemps']
+                    [CONFIG['arbit'][2].lower()] + CONFIG['styletemps']
             ):
                 go_on = False
                 break

@@ -1,2 +1,2 @@
 [MESSAGES CONTROL]
-disable=invalid-name,redefined-outer-name
+disable=invalid-name,redefined-outer-name,useless-object-inheritance
