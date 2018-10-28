@@ -1,3 +1,2 @@
 login.txt
-inaccuratecache.pickle
-config.pickle
+*.pickle

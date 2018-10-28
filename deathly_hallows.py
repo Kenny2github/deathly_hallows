@@ -1,17 +1,48 @@
 """It's a bot."""
-import sys
+#Low-level imports
 import os
+import io
 import time
 import re
+#Parsers
+import argparse
 from urllib.parse import urlparse, unquote
 import pickle
+#Third-party
 import mwparserfromhell as mwp
-import easygui as e
+import tinify
 import mw_api_client as mwc
 
 #protect against importing
 if __name__ != '__main__':
     raise RuntimeError('This module cannot be imported!')
+
+argparser = argparse.ArgumentParser(description='Run the bot.')
+argparser.add_argument('--refresh-config', action='store_true',
+                       help='refresh configuration before running')
+argparser.add_argument('--confirmedit', action='store_true',
+                       help='require confirmation before editing')
+argparser.add_argument('-a', dest='semi', action='store_true',
+                       help='only run semi-automatic processes')
+argparser.add_argument('-A', dest='fully', action='count',
+                       help='only run fully automatic processes. Use -AA to '
+                       'only run fully automatic processes that require no '
+                       'input.')
+argparser.add_argument('--no-style-fix', action='store_true',
+                       help='do not fix style guidelines, only report them')
+argparser.add_argument('--no-style-template', action='store_true',
+                       help='do not report style guidelines, only fix them')
+argparser.add_argument('--nocache', action='store_true',
+                       help='do not use caches')
+argparser.add_argument('--only', metavar='process', nargs='*',
+                       help='only run these processes')
+argparser.add_argument('--page', nargs='*',
+                       help='only run processes on these pages')
+argparser.add_argument('--sleep', metavar='seconds', nargs='?', type=int,
+                       help='how many seconds to wait between requests')
+arguments = argparser.parse_args()
+if not arguments.fully or arguments.fully < 2:
+    import easygui as e
 
 #setup
 print('Loading login data...')
@@ -19,12 +50,14 @@ with open('login.txt') as info: #open login info
     USERNAME = info.readline().strip() #username on first line
     PASSWORD = info.readline().strip() #password on second line
     API = info.readline().strip() #api url on third line
+    tinify.key = info.readline().strip()
+
 print('Loaded login data.')
 sw = mwc.Wiki(API, 'Python/3.6.3, deathly_hallows/2.0') #init the wiki
 #get configuration
 print('Loading config...')
 CONFIG = {}
-if '--refresh-config' in sys.argv or 'config.pickle' not in os.listdir('.'):
+if arguments.refresh_config or 'config.pickle' not in os.listdir('.'):
     print(' Fetching config...')
     CONFIG['arbit'] = list(sw.page(f'User:{USERNAME}/Config/ArbitraryPages')
                            .revisions(1))[0].comment.split(';')
@@ -396,21 +429,18 @@ class StyleGuide(object): #pylint: disable=too-many-public-methods
         return parsed
     #pylint: enable=missing-docstring
 
-def runme(name, semiauto=False):
+def runme(name, semiauto=False, stdin=False):
     """Check if this section should run."""
-    if '--fully-automatic' in sys.argv and semiauto:
+    if arguments.fully and arguments.fully > 1 and (stdin or semiauto):
         return False
-    if '--semi-automatic' in sys.argv and not semiauto:
+    if arguments.fully and semiauto:
         return False
-    if '--only' not in sys.argv:
+    if not arguments.only:
         return True
-    idx = sys.argv.index('--only')
-    return name in sys.argv[idx + 1].split(',')
+    return name in arguments.only
 
-if '--sleep' in sys.argv:
-    sleeptime = int(sys.argv[sys.argv.index('--sleep') + 1])
-else:
-    sleeptime = 1
+if not arguments.sleep:
+    arguments.sleep = 1
 
 #login
 print('Logging in...')
@@ -419,7 +449,7 @@ print('Login result:', loginresult['status'])
 
 def submitedit(pageobj_, contents_, summ):
     """Submit edit function"""
-    if '--confirmedit' in sys.argv:
+    if arguments.confirmedit and arguments.fully < 2:
         confirm = e.codebox(f'Confirm edit on {pageobj_.title}',
                             'Confirm Edit', contents_)
         if confirm is None or not confirm.strip():
@@ -428,6 +458,8 @@ def submitedit(pageobj_, contents_, summ):
         result = pageobj_.edit(contents_, summ, nocreate=1)
         return result['edit']['result']
     except mwc.excs.WikiError as exc:
+        if arguments.fully > 1:
+            return f'Failed ({exc})'
         done = (e.codebox('Copy the content below and edit the page yourself '
                           '- an automatic edit failed.',
                           'Manual Edit',
@@ -451,15 +483,15 @@ def submitedit(pageobj_, contents_, summ):
 #     5. submits the edit.
 
 
-if runme('depersonifying', True):
+if runme('depersonifying', True, True):
     limit = int(input('Press Enter to skip de-personifying, or a number '
                       '(then Enter) to do it on that amount of pages: ') or '0')
     if limit: #if limit != 0
         pages = [] #no pages yet
         print(' Requesting random pages...')
         pages = (sw.random(limit=limit, namespace=0)
-                 if '--page' not in sys.argv
-                 else (sw.page(sys.argv[sys.argv.index('--page') + 1]),))
+                 if not arguments.page
+                 else (sw.page(i) for i in arguments.page))
         print(' Requested random pages.')
         for page in pages: #for every page
             content = page.read()
@@ -503,15 +535,15 @@ if runme('depersonifying', True):
 #     5. submits the edit.
 
 
-if runme('references', True):
+if runme('references', True, True):
     limit = int(input('Press Enter to skip reference updating, '
                       'or a number (then Enter) to do it on that amount of pages: ') or '0')
     if limit: #if limit != 0
         pages = [] #no pages yet
         print(' Requesting random pages...')
         pages = (sw.random(limit=limit, namespace=0)
-                 if '--page' not in sys.argv
-                 else (sw.page(sys.argv[sys.argv.index('--page') + 1]),))
+                 if not arguments.page
+                 else (sw.page(i) for i in arguments.page))
         print(' Requested random pages.')
         for page in pages: #for every page
             content = page.read()
@@ -580,8 +612,8 @@ The process is:
 
 if runme('dates'):
     cms = (sw.category(CONFIG['arbit'][1]).categorymembers()
-           if '--page' not in sys.argv
-           else (sw.page(sys.argv[sys.argv.index('--page') + 1]),))
+           if not arguments.page
+           else (sw.page(i) for i in arguments.page))
     for page in cms: #for every title
         print('Page', page.title)
         content = page.read()
@@ -608,11 +640,11 @@ if runme('dates'):
                              'Automated edit: added dates to templates')) #submit the edit!
         else:
             print("Page", page.title, "was not edited.") #no change
-        time.sleep(sleeptime)
+        time.sleep(arguments.sleep)
 
 #raise SystemExit #uncomment this to stop here
 
-if runme('extlinks'):
+if runme('extlinks', False, True):
     limit = int(input('Enter a number of pages to check for external links, \
 or hit Enter to skip: ') or 0)
     if limit: #if limit != 0
@@ -623,8 +655,8 @@ or hit Enter to skip: ') or 0)
         pages = [] #no pages yet
         print(' Requesting random pages...')
         pages = (sw.random(limit=limit, namespace=0)
-                 if '--page' not in sys.argv
-                 else (sw.page(sys.argv[sys.argv.index('--page') + 1]),))
+                 if not arguments.page
+                 else (sw.page(i) for i in arguments.page))
         print(' Requested random pages.')
         for page in pages: #for every page
             print('Page {}'.format(page.title))
@@ -664,7 +696,7 @@ or hit Enter to skip: ') or 0)
                 print('Not edited.')
                 continue
             print('Edit: {}'.format(submitedit(page, content, summary)))
-            time.sleep(sleeptime)
+            time.sleep(arguments.sleep)
     else:
         del limit
 
@@ -691,12 +723,17 @@ or hit Enter to skip: ') or 0)
 #     4. submits the edit.
 
 
-if runme('style'):
+if runme('style', False, True):
     limit = int(input('Enter a number of pages to check for bad style (default 10): ') or '10')
+elif runme('style'): # even if no stdin, this has work to do
+    limit = 10
+else: # no run because of --only
+    limit = 0
+if limit:
     print(' Requesting random pages...')
     pages = (sw.random(limit=limit, namespace=0)
-             if '--page' not in sys.argv
-             else (sw.page(sys.argv[sys.argv.index('--page') + 1]),))
+             if not arguments.page
+             else (sw.page(i) for i in arguments.page))
     print(' Requested random pages.')
     for page in pages:
         print('Page', page)
@@ -725,7 +762,7 @@ if runme('style'):
                     passed = getattr(StyleGuide, k.replace('-', '_'),
                                      lambda *_: True)(parsed_content)
                     if not passed:
-                        if '--no-style-fix' not in sys.argv and hasattr(
+                        if not arguments.no_style_fix and hasattr(
                                 StyleGuide, 'fix_' + k.replace('-', '_')):
                             parsed_content = getattr(
                                 StyleGuide,
@@ -733,7 +770,7 @@ if runme('style'):
                             )(parsed_content)
                             fixed += 1
                             print(' Fixed flaw:', k)
-                        elif '--no-style-template' not in sys.argv:
+                        elif not arguments.no_style_template:
                             print(' Found flaw:', k)
                             bads.append(k)
             if bads:
@@ -777,7 +814,84 @@ if runme('style'):
                 print('Page', page, 'was not edited - no broken guidelines found.')
         else:
             print(' Ignorer template in page, skipping.')
-        time.sleep(sleeptime)
+        time.sleep(arguments.sleep)
+
+#raise SystemExit #uncomment this to stop here
+
+# This section is the file compression section.
+# The process is:
+# 1. Fetch file upload logs
+# 2. For each log:
+#     1. Get the upload URL, comment, and size
+#     2. Compress the file with Tinify
+#     3. If the size difference is less than 1KB, skip it (not worth uploading)
+#     4. Upload the compressed file as a new version
+
+if runme('compress', False, True):
+    limit = int(input('Enter a number of files to compress (default 10): ') or '10')
+elif runme('compress'):
+    limit = 10
+else:
+    limit = 0
+if limit:
+    if not arguments.nocache:
+        try:
+            with open('compressioncache.pickle', 'rb') as cache:
+                cache = pickle.load(cache)
+        except IOError:
+            cache = set()
+    else:
+        cache = set()
+    try:
+        logs = (sw.logevents(limit, letype='upload')
+                if not arguments.page
+                else sw.logevents(limit, letype='upload', letitle=arguments.page[0]))
+        bots = set(i.name for i in sw.allusers(ingroup='bot'))
+        for upload in logs:
+            if upload.title in cache:
+                print(upload.title, 'already in cache, skipping')
+                continue
+            cache.add(upload.title)
+            if upload.user in bots:
+                print('Log ID', upload.logid, 'was done by bot, skipping')
+                continue
+            if not upload.title.casefold().endswith(('.png', '.jpg')):
+                print(upload.title, 'is not JPG or PNG, skipping')
+                continue
+            print(upload.title)
+            info = tuple(sw.request(**{
+                'action': 'query',
+                'prop': 'imageinfo',
+                'titles': upload.title,
+                'iiprop': 'url|size|comment'
+            })['query']['pages'].values())[0]
+            if 'imageinfo' not in info:
+                print('', upload.title, 'is probably deleted, skipping')
+                continue
+            info = info['imageinfo'][0]
+            if 'compress' in info['comment'].casefold():
+                print(' Comment ({})'.format(info['comment']),
+                      'indicates image was probably already compressed')
+                continue
+            uploadurl = info['url']
+            size = info['size']
+            print('', uploadurl, 'is', size, 'bytes long')
+            source = tinify.from_url(uploadurl) #pylint: disable=no-member
+            buff = source.to_buffer()
+            size2 = len(buff)
+            if (size - size2) < 1000:
+                print(' Size difference less than 1K:', size - size2)
+                continue
+            fobj = io.BytesIO(buff)
+            print('Upload:', sw.upload(
+                fobj, upload.title, 'Automated upload: Compressed', True
+            )['upload']['result'])
+            time.sleep(arguments.sleep)
+    except tinify.AccountError as exc:
+        print('AccountError:', exc)
+    finally:
+        with open('compressioncache.pickle', 'wb') as cach:
+            pickle.dump(cache, cach, -1)
 
 #raise SystemExit #uncomment this to stop here
 
@@ -797,16 +911,18 @@ if runme('style'):
 
 
 if runme('cn'):
-    if '--nocache' not in sys.argv:
+    if not arguments.nocache:
         try:
             with open('inaccuratecache.pickle', 'rb') as cache:
                 cache = pickle.load(cache) #load cache
+                if isinstance(cache, list): #previous revision used lists
+                    cache = set(cache) #convert to set
         except IOError: #if there isn't any cache
-            cache = [] #make an empty cache
+            cache = set() #make an empty cache
     else:
-        cache = [] #no cache, reset it
+        cache = set() #no cache, reset it
 
-    if '--page' not in sys.argv:
+    if not arguments.page:
         eis = [] #empty list for now
         eis.extend([ei.title for ei in sw.template('citation needed')
                     .transclusions(namespace='0|4|12')])
@@ -816,7 +932,7 @@ if runme('cn'):
             if ei.title in eis:
                 eis.remove(ei.title)
     else:
-        eis = (sys.argv[sys.argv.index('--page') + 1],)
+        eis = arguments.page
     try:
         for page in eis: #for every page in embeddedins
             try:
@@ -825,7 +941,7 @@ if runme('cn'):
                     continue #if the page is in the cache, skip it
                 else:
                     print('Page', page) #log which page we're working on
-                    cache.append(page) #add the page to cache
+                    cache.add(page) #add the page to cache
                     pageobj = sw.page(page, getinfo=True)
                     if pageobj.ns in (2, 3): #if this page is in userspace
                         print(' In userspace, skipping.')
