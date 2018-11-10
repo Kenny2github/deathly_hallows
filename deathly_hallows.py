@@ -458,7 +458,7 @@ def submitedit(pageobj_, contents_, summ):
         result = pageobj_.edit(contents_, summ, nocreate=1)
         return result['edit']['result']
     except mwc.excs.WikiError as exc:
-        if arguments.fully > 1:
+        if arguments.fully and arguments.fully > 1:
             return f'Failed ({exc})'
         done = (e.codebox('Copy the content below and edit the page yourself '
                           '- an automatic edit failed.',
@@ -582,12 +582,12 @@ if runme('references', True, True):
 def get_date(pageob, templatename): #get date from diffs function
     """Get the date that a certain template was added.
 The process is:
-1. Get a list of revision IDs, and for each revision:
-    1. Get the difference to the previous revision,
-    2. Get a list of tags whose names are not "del"
-    3. Use a monster regex to find out if this diff added the particular template we're looking for,
-    4. If it did, set the date to a time.struct_time from the revision timestamp, and break.
-2. If the date was never set, assume it's the date of the earliest revision,
+1. Get a generator of revisions, and for each revision:
+    1. Add the revision to the "processed" list,
+    2. Get the contents of the revision,
+    3. Find if the revision has the template.
+    4. If it doesn't, break - the revision just before was the revision it was added.
+2. If there are less than 2 processed revisions, assume the date is at the earliest revision.
 3. Get the month name and year, and return that."""
     print(f'Adding date to template {templatename}\n  Getting date') #log getting date
     processed = []
@@ -674,7 +674,6 @@ or hit Enter to skip: ') or 0)
                     break
             extlinkq = False
             for link in parsed.ifilter_external_links():
-                print(link)
                 parsed_url = urlparse(str(link.url))
                 if not re.search(r'(?:.*\.)?(?:' + CONFIG['localdomains'] + ')$',
                                  parsed_url.netloc, re.I):
@@ -682,18 +681,19 @@ or hit Enter to skip: ') or 0)
                     break
             summary = 'Automated edit: '
             if exttemp is None and extlinkq:
-                content = '{{{{{}}}}}'.format(CONFIG['arbit'][4]) + content
+                content = '{{{{{}}}}}\n'.format(CONFIG['arbit'][4]) + content
                 summary += 'Added {{{{[[Template:{0}|{0}]]}}}}'.format(
                     CONFIG['arbit'][4]
                 )
             elif exttemp and not extlinkq:
                 parsed.remove(exttemp)
-                content = str(parsed)
+                content = str(parsed).strip()
                 summary += 'Removed {{{{[[Template:{0}|{0}]]}}}}'.format(
                     CONFIG['arbit'][4]
                 )
             else:
                 print('Not edited.')
+                time.sleep(arguments.sleep)
                 continue
             print('Edit: {}'.format(submitedit(page, content, summary)))
             time.sleep(arguments.sleep)
