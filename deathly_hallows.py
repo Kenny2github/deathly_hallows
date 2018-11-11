@@ -8,6 +8,7 @@ import re
 import argparse
 from urllib.parse import urlparse, unquote
 import pickle
+import json
 #Third-party
 import mwparserfromhell as mwp
 import tinify
@@ -59,10 +60,12 @@ print('Loading config...')
 CONFIG = {}
 if arguments.refresh_config or 'config.pickle' not in os.listdir('.'):
     print(' Fetching config...')
-    CONFIG['arbit'] = list(sw.page(f'User:{USERNAME}/Config/ArbitraryPages')
-                           .revisions(1))[0].comment.split(';')
+    cont = sw.page(f'User:{USERNAME}/Config/ArbitraryPages').read()
+    cont = cont.split('<pre>', 1)[1].split('</pre>', 1)[0]
+    CONFIG['arbit'] = json.loads(cont)
+    del cont
     print(' Loaded config: arbitrary page names')
-    gen = sw.category(CONFIG['arbit'][0]).categorymembers(cmnamespace=10)
+    gen = sw.category(CONFIG['arbit']['datetcat']).categorymembers(cmnamespace=10)
     gen = [cm for cm in gen if not cm.title.endswith('/doc')] #no documentations
     templates = gen[:]
     for temp_ in gen: #for every template
@@ -264,7 +267,7 @@ class StyleGuide(object): #pylint: disable=too-many-public-methods
     @staticmethod
     def no_main_underscores(parsed):
         for template in parsed.ifilter_templates():
-            if template.name.lower() == 'main':
+            if template.name.lower() == CONFIG['arbit']['main']:
                 if '_' in template.get('1'):
                     return False
         return True
@@ -272,7 +275,7 @@ class StyleGuide(object): #pylint: disable=too-many-public-methods
     @staticmethod
     def fix_no_main_underscores(parsed):
         for template in parsed.ifilter_templates():
-            if template.name.lower() == 'main':
+            if template.name.lower() == CONFIG['arbit']['main']:
                 template.params[0].value = str(template.params[0].value).replace(
                     '_', ' '
                 )
@@ -611,7 +614,7 @@ The process is:
     return date
 
 if runme('dates'):
-    cms = (sw.category(CONFIG['arbit'][1]).categorymembers()
+    cms = (sw.category(CONFIG['arbit']['datepcat']).categorymembers()
            if not arguments.page
            else (sw.page(i) for i in arguments.page))
     for page in cms: #for every title
@@ -621,7 +624,7 @@ if runme('dates'):
         #nobots check
         go_on = True
         for umtemplate in parsed_content.ifilter_templates():
-            if umtemplate.name.lower() == 'nobots':
+            if umtemplate.name.lower() == CONFIG['arbit']['nobots']:
                 go_on = False
                 break
         if not go_on:
@@ -648,10 +651,9 @@ if runme('extlinks', False, True):
     limit = int(input('Enter a number of pages to check for external links, \
 or hit Enter to skip: ') or 0)
     if limit: #if limit != 0
-        templates = [CONFIG['arbit'][4]]
+        templates = [CONFIG['arbit']['extlinks']]
         for page in sw.template(templates[0]).redirects():
             templates.append(page.title[9:])
-        print(templates)
         pages = [] #no pages yet
         print(' Requesting random pages...')
         pages = (sw.random(limit=limit, namespace=0)
@@ -664,7 +666,6 @@ or hit Enter to skip: ') or 0)
             parsed = mwp.parse(content)
             exttemp = None
             for template in parsed.ifilter_templates():
-                print(template)
                 name = str(template.name)
                 name = name[0].upper() + name[1:]
                 if re.fullmatch('([Tt]emplate:)?({})'
@@ -681,15 +682,15 @@ or hit Enter to skip: ') or 0)
                     break
             summary = 'Automated edit: '
             if exttemp is None and extlinkq:
-                content = '{{{{{}}}}}\n'.format(CONFIG['arbit'][4]) + content
+                content = '{{{{{}}}}}\n'.format(CONFIG['arbit']['extlinks']) + content
                 summary += 'Added {{{{[[Template:{0}|{0}]]}}}}'.format(
-                    CONFIG['arbit'][4]
+                    CONFIG['arbit']['extlinks']
                 )
             elif exttemp and not extlinkq:
                 parsed.remove(exttemp)
                 content = str(parsed).strip()
                 summary += 'Removed {{{{[[Template:{0}|{0}]]}}}}'.format(
-                    CONFIG['arbit'][4]
+                    CONFIG['arbit']['extlinks']
                 )
             else:
                 print('Not edited.')
@@ -741,13 +742,13 @@ if limit:
         parsed_content = mwp.parse(content)
         ignore = []
         for good_style in parsed_content.ifilter_templates():
-            if good_style.name.lower() == CONFIG['arbit'][3].lower():
+            if good_style.name.lower() == CONFIG['arbit']['good'].lower():
                 ignore = good_style.params
                 break
         go_on = True
         for warntemplate in parsed_content.ifilter_templates():
             if warntemplate.name.lower() in (
-                    [CONFIG['arbit'][2].lower()] + CONFIG['styletemps']
+                    [CONFIG['arbit']['bad'].lower()] + CONFIG['styletemps']
             ):
                 go_on = False
                 break
@@ -774,7 +775,7 @@ if limit:
                             print(' Found flaw:', k)
                             bads.append(k)
             if bads:
-                insert = '\n{{' + CONFIG['arbit'][2] + '\n|' + '\n|'.join(bads) \
+                insert = '\n{{' + CONFIG['arbit']['bad'] + '\n|' + '\n|'.join(bads) \
                          + '\n|date={{subst:CURRENTMONTHNAME}} {{subst:CURRENTYEAR}}\n}}\n'
                 wikilinks = parsed_content.filter_wikilinks()
                 wikilinks = list(filter(
@@ -789,7 +790,7 @@ if limit:
                 content = str(parsed_content)
                 if bads and not fixed:
                     comment = 'Automated edit: added {} ({} guideline{} broken)'.format(
-                        '{{[[Template:%s|%s]]}}' % ((CONFIG['arbit'][2],) * 2),
+                        '{{[[Template:%s|%s]]}}' % ((CONFIG['arbit']['bad'],) * 2),
                         len(bads),
                         '' if len(bads) == 1 else 's'
                     )
@@ -800,7 +801,7 @@ if limit:
                     )
                 else:
                     comment = 'Automated edit: added {} ({} guideline{} broken) ({} fixed)'.format(
-                        '{{[[Template:%s|%s]]}}' % ((CONFIG['arbit'][2],) * 2),
+                        '{{[[Template:%s|%s]]}}' % ((CONFIG['arbit']['bad'],) * 2),
                         len(bads),
                         '' if len(bads) == 1 else 's',
                         fixed
@@ -950,7 +951,7 @@ if runme('cn'):
                     parsed_content = mwp.parse(content, 0, True)
                     go_on = True
                     for warntemplate in parsed_content.ifilter_templates():
-                        if warntemplate.name.lower() == 'nobots':
+                        if warntemplate.name.lower() == CONFIG['arbit']['nobots']:
                             go_on = False
                             break
                     if not go_on:
@@ -963,7 +964,7 @@ if runme('cn'):
                     for cntemplate in parsed_content.ifilter_templates():
                         if cntemplate.name.lower() in ('cn', 'citation needed'):
                             detected += 1
-                        elif cntemplate.name.lower() == 'inaccurate':
+                        elif cntemplate.name.lower() == CONFIG['arbit']['inaccurate']:
                             inaccurate_already = True
                     if detected > CONFIG['cncount'] and not inaccurate_already:
                         content = '{{inaccurate|date={{subst:CURRENTMONTHNAME}} ' \
