@@ -430,6 +430,58 @@ class StyleGuide(object): #pylint: disable=too-many-public-methods
             if tag.tag == 'pre':
                 tag.contents = tag.contents.strip('\n')
         return parsed
+
+    @staticmethod
+    def internal_forum_links(parsed):
+        for link in parsed.ifilter_external_links():
+            if re.search(
+                    r'^https?://scratch\.mit\.edu/discuss/(topic|post)/[0-9]+',
+                    str(link.url)
+            ):
+                return False
+            if re.search(
+                    r'^https?://scratcharchive.asun.co/forums/viewtopic.php',
+                    str(link.url)
+            ):
+                return False
+        return True
+
+    @staticmethod
+    def fix_internal_forum_links(parsed):
+        for link in parsed.ifilter_external_links():
+            url = str(link.url)
+            if re.search(
+                    r'^https?://scratch\.mit\.edu/discuss/(topic|post)/[0-9]+',
+                    url
+            ):
+                #check for post first
+                rep = '[['
+                if 'discuss/post' in url:
+                    rep += 'post:' + re.search('post/([0-9]+)', url).group(1)
+                elif '#post-' in url:
+                    rep += 'post:' + re.search('#post-([0-9]+)', url).group(1)
+                elif 'discuss/topic' in url:
+                    rep += 'topic:' + re.search('topic/([0-9]+)', url).group(1)
+                if link.title:
+                    rep += '|' + str(link.title)
+                rep += ']]'
+                parsed.replace(link, rep)
+                continue
+            if re.search(
+                    r'^https?://scratcharchive.asun.co/forums/viewtopic.php',
+                    url
+            ):
+                rep = '[[ar-'
+                if '?pid=' in url:
+                    rep += 'post:' + re.search('?pid=([0-9]+)', url).group(1)
+                elif '?id=' in url:
+                    rep += 'topic:' + re.search('?id=([0-9]+)', url).group(1)
+                if link.title:
+                    rep += '|' + str(link.title)
+                rep += ']]'
+                parsed.replace(link, rep)
+                continue
+        return parsed
     #pylint: enable=missing-docstring
 
 def runme(name, semiauto=False, stdin=False):
