@@ -60,7 +60,7 @@ print('Loading config...')
 CONFIG = {}
 if arguments.refresh_config or 'config.pickle' not in os.listdir('.'):
     print(' Fetching config...')
-    cont = sw.page(f'User:{USERNAME}/Config/ArbitraryPages').read()
+    cont = sw.page(f'User:{USERNAME}/Config/ArbitraryStrings').read()
     cont = cont.split('<pre>', 1)[1].split('</pre>', 1)[0]
     CONFIG['arbit'] = json.loads(cont)
     del cont
@@ -150,8 +150,13 @@ class StyleGuide(object): #pylint: disable=too-many-public-methods
     @staticmethod
     def no_ext_wikilinks(parsed):
         for link in parsed.ifilter_external_links():
-            if re.match(r'https?://en\.scratch-wiki\.info',
-                        str(link.url), re.I):
+            if re.search(
+                    r'^https?://'
+                    + CONFIG['arbit']['domain']
+                    + r'/w(/index\.php|iki)',
+                    str(link.url),
+                    re.I
+            ):
                 return False
         return True
 
@@ -159,8 +164,13 @@ class StyleGuide(object): #pylint: disable=too-many-public-methods
     def fix_no_ext_wikilinks(parsed):
         links = parsed.filter_external_links()
         for link in links:
-            if re.match(r'https?://en\.scratch-wiki\.info',
-                        str(link.url), re.I):
+            if re.search(
+                    r'^https?://'
+                    + CONFIG['arbit']['domain']
+                    + r'/w(/index\.php|iki)',
+                    str(link.url),
+                    re.I
+            ):
                 url = urlparse(str(link.url))
                 letitle = url.path.rsplit('/', 1)[1]
                 letitle = unquote(letitle).replace('_', ' ')
@@ -473,9 +483,9 @@ class StyleGuide(object): #pylint: disable=too-many-public-methods
             ):
                 rep = '[[ar-'
                 if '?pid=' in url:
-                    rep += 'post:' + re.search('?pid=([0-9]+)', url).group(1)
+                    rep += 'post:' + re.search(r'\?pid=([0-9]+)', url).group(1)
                 elif '?id=' in url:
-                    rep += 'topic:' + re.search('?id=([0-9]+)', url).group(1)
+                    rep += 'topic:' + re.search(r'\?id=([0-9]+)', url).group(1)
                 if link.title:
                     rep += '|' + str(link.title)
                 rep += ']]'
