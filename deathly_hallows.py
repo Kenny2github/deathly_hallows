@@ -958,6 +958,7 @@ if limit:
                 print(' Size difference less than 1K:', size - size2)
                 continue
             fobj = io.BytesIO(buff)
+            print(' Compressed, uploading')
             print('Upload:', sw.upload(
                 fobj, upload.title, 'Automated upload: Compressed', True
             )['upload']['result'])
