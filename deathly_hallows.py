@@ -41,6 +41,8 @@ argparser.add_argument('--page', nargs='*',
                        help='only run processes on these pages')
 argparser.add_argument('--sleep', metavar='seconds', nargs='?', type=int,
                        help='how many seconds to wait between requests')
+argparser.add_argument('--limit', metavar='limit', nargs='?', type=int,
+                       help='how many pages to request in all cases')
 arguments = argparser.parse_args()
 if not arguments.fully or arguments.fully < 2:
     import easygui as e
@@ -549,8 +551,10 @@ def submitedit(pageobj_, contents_, summ):
 
 
 if runme('depersonifying', True, True):
-    limit = int(input('Press Enter to skip de-personifying, or a number '
-                      '(then Enter) to do it on that amount of pages: ') or '0')
+    limit = arguments.limit or int(input(
+        'Press Enter to skip de-personifying, or a number'
+        ' (then Enter) to do it on that amount of pages: '
+    ) or '0')
     if limit: #if limit != 0
         pages = [] #no pages yet
         print(' Requesting random pages...')
@@ -601,8 +605,10 @@ if runme('depersonifying', True, True):
 
 
 if runme('references', True, True):
-    limit = int(input('Press Enter to skip reference updating, '
-                      'or a number (then Enter) to do it on that amount of pages: ') or '0')
+    limit = arguments.limit or int(input(
+        'Press Enter to skip reference updating,'
+        ' or a number (then Enter) to do it on that amount of pages: '
+    ) or '0')
     if limit: #if limit != 0
         pages = [] #no pages yet
         print(' Requesting random pages...')
@@ -710,8 +716,10 @@ if runme('dates'):
 #raise SystemExit #uncomment this to stop here
 
 if runme('extlinks', False, True):
-    limit = int(input('Enter a number of pages to check for external links, \
-or hit Enter to skip: ') or 0)
+    limit = arguments.limit or int(input(
+        'Enter a number of pages to check for external links,'
+        ' or hit Enter to skip: '
+    ) or '0')
     if limit: #if limit != 0
         templates = [CONFIG['arbit']['extlinks']]
         for page in sw.template(templates[0]).redirects():
@@ -787,9 +795,11 @@ or hit Enter to skip: ') or 0)
 
 
 if runme('style', False, True):
-    limit = int(input('Enter a number of pages to check for bad style (default 10): ') or '10')
+    limit = arguments.limit or int(input(
+        'Enter a number of pages to check for bad style (default 10): '
+    ) or '10')
 elif runme('style'): # even if no stdin, this has work to do
-    limit = 10
+    limit = arguments.limit or 10
 else: # no run because of --only
     limit = 0
 if limit:
@@ -891,9 +901,11 @@ if limit:
 #     4. Upload the compressed file as a new version
 
 if runme('compress', False, True):
-    limit = int(input('Enter a number of files to compress (default 10): ') or '10')
+    limit = arguments.limit or int(input(
+        'Enter a number of files to compress (default 10): '
+    ) or '10')
 elif runme('compress'):
-    limit = 10
+    limit = arguments.limit or 10
 else:
     limit = 0
 if limit:
