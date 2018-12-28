@@ -914,9 +914,9 @@ if limit:
             with open('compressioncache.pickle', 'rb') as cache:
                 cache = pickle.load(cache)
         except IOError:
-            cache = set()
+            cache = {}
     else:
-        cache = set()
+        cache = {}
     try:
         logs = (sw.logevents(limit, letype='upload')
                 if not arguments.page
@@ -924,9 +924,14 @@ if limit:
         bots = set(i.name for i in sw.allusers(ingroup='bot'))
         for upload in logs:
             if upload.title in cache:
-                print(upload.title, 'already in cache, skipping')
-                continue
-            cache.add(upload.title)
+                if time.mktime(time.strptime(
+                        upload.timestamp, '%Y-%m-%dT%H:%M:%SZ'
+                )) <= cache[upload.title]:
+                    print(upload.title, 'already in cache, skipping')
+                    continue
+            cache[upload.title] = time.mktime(time.strptime(
+                upload.timestamp, '%Y-%m-%dT%H:%M:%SZ'
+            ))
             if upload.user in bots:
                 print('Log ID', upload.logid, 'was done by bot, skipping')
                 continue
