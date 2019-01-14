@@ -809,7 +809,7 @@ if limit:
              else (sw.page(i) for i in arguments.page))
     print(' Requested random pages.')
     for page in pages:
-        print('Page', page)
+        print('Page', page.title)
         content = page.read()
         parsed_content = mwp.parse(content)
         ignore = []
@@ -884,7 +884,7 @@ if limit:
                     comment
                 ))
             else:
-                print('Page', page, 'was not edited - no broken guidelines found.')
+                print('Page', page.title, 'was not edited - no broken guidelines found.')
         else:
             print(' Ignorer template in page, skipping.')
         time.sleep(arguments.sleep)
@@ -948,6 +948,8 @@ if limit:
             if 'imageinfo' not in info:
                 print('', upload.title, 'is probably deleted, skipping')
                 continue
+            if 'known' in info:
+                print('', upload.title, 'is actually not on this wiki, skipping')
             info = info['imageinfo'][0]
             if 'compress' in info['comment'].casefold():
                 print(' Comment ({})'.format(info['comment']),
