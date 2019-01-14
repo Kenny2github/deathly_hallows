@@ -104,6 +104,12 @@ if arguments.refresh_config or 'config.pickle' not in os.listdir('.'):
     CONFIG['localdomains'] = list(sw.page(f'User:{USERNAME}/Config/LocalExtDomains')
                                   .revisions(1))[0].comment
     print(' Loaded config: non-external link domains')
+    CONFIG['compresstitle'] = list(sw.page(f'User:{USERNAME}/Config/CompressTitle')
+                                   .revisions(1))[0].comment
+    print(' Loaded config: compression message title')
+    contents = sw.page(f'User:{USERNAME}/Config/CompressMsg').read()
+    CONFIG['compressmsg'] = re.search('<pre>(.*)</pre>', contents, re.S).group(1).strip()
+    print(' Loaded config: compression message')
     print(' Pickling config...')
     with open('config.pickle', 'wb') as config:
         pickle.dump(CONFIG, config, -1)
@@ -923,53 +929,67 @@ if limit:
                 else sw.logevents(limit, letype='upload', letitle=arguments.page[0]))
         bots = set(i.name for i in sw.allusers(ingroup='bot'))
         for upload in logs:
-            if upload.title in cache:
-                if time.mktime(time.strptime(
-                        upload.timestamp, '%Y-%m-%dT%H:%M:%SZ'
-                )) <= cache[upload.title]:
-                    print(upload.title, 'already in cache, skipping')
+            try:
+                if upload.title in cache:
+                    if time.mktime(time.strptime(
+                            upload.timestamp, '%Y-%m-%dT%H:%M:%SZ'
+                    )) <= cache[upload.title]:
+                        print(upload.title, 'already in cache, skipping')
+                        continue
+                cache[upload.title] = time.mktime(time.strptime(
+                    upload.timestamp, '%Y-%m-%dT%H:%M:%SZ'
+                ))
+                if upload.user in bots:
+                    print('Log ID', upload.logid, 'was done by bot, skipping')
                     continue
-            cache[upload.title] = time.mktime(time.strptime(
-                upload.timestamp, '%Y-%m-%dT%H:%M:%SZ'
-            ))
-            if upload.user in bots:
-                print('Log ID', upload.logid, 'was done by bot, skipping')
-                continue
-            if not upload.title.casefold().endswith(('.png', '.jpg')):
-                print(upload.title, 'is not JPG or PNG, skipping')
-                continue
-            print(upload.title)
-            info = tuple(sw.request(**{
-                'action': 'query',
-                'prop': 'imageinfo',
-                'titles': upload.title,
-                'iiprop': 'url|size|comment'
-            })['query']['pages'].values())[0]
-            if 'imageinfo' not in info:
-                print('', upload.title, 'is probably deleted, skipping')
-                continue
-            if 'known' in info:
-                print('', upload.title, 'is actually not on this wiki, skipping')
-            info = info['imageinfo'][0]
-            if 'compress' in info['comment'].casefold():
-                print(' Comment ({})'.format(info['comment']),
-                      'indicates image was probably already compressed')
-                continue
-            uploadurl = info['url']
-            size = info['size']
-            print('', uploadurl, 'is', size, 'bytes long')
-            source = tinify.from_url(uploadurl) #pylint: disable=no-member
-            buff = source.to_buffer()
-            size2 = len(buff)
-            if (size - size2) < 1000:
-                print(' Size difference less than 1K:', size - size2)
-                continue
-            fobj = io.BytesIO(buff)
-            print(' Compressed, uploading')
-            print('Upload:', sw.upload(
-                fobj, upload.title, 'Automated upload: Compressed', True
-            )['upload']['result'])
-            time.sleep(arguments.sleep)
+                if not upload.title.casefold().endswith(('.png', '.jpg')):
+                    print(upload.title, 'is not JPG or PNG, skipping')
+                    continue
+                print(upload.title)
+                info = tuple(sw.request(**{
+                    'action': 'query',
+                    'prop': 'imageinfo',
+                    'titles': upload.title,
+                    'iiprop': 'url|size|comment|user'
+                })['query']['pages'].values())[0]
+                if 'imageinfo' not in info:
+                    print('', upload.title, 'is probably deleted, skipping')
+                    continue
+                if 'known' in info:
+                    print('', upload.title, 'is actually not on this wiki, skipping')
+                info = info['imageinfo'][0]
+                if 'compress' in info['comment'].casefold():
+                    print(' Comment ({})'.format(info['comment']),
+                          'indicates image was probably already compressed')
+                    continue
+                uploadurl = info['url']
+                size = info['size']
+                print('', uploadurl, 'is', size, 'bytes long')
+                source = tinify.from_url(uploadurl) #pylint: disable=no-member
+                buff = source.to_buffer()
+                size2 = len(buff)
+                if (size - size2) < 1000:
+                    print(' Size difference less than 1K:', size - size2)
+                    continue
+                fobj = io.BytesIO(buff)
+                print(' Compressed, uploading')
+                print('Upload:', sw.upload(
+                    fobj, upload.title, 'Automated upload: Compressed', True
+                )['upload']['result'])
+                talkpage = sw.page('User talk:' + info['user'])
+                if '{{nobots}}' in talkpage.read().lower():
+                    print('{{NoBots}} in talk page, notification skipped')
+                else:
+                    print('Notification:', sw.page('User talk:' + info['user']).edit(
+                        CONFIG['compressmsg'].format(upload.title),
+                        'Automated edit: Notified user', section='new',
+                        sectiontitle=CONFIG['compresstitle']
+                    )['edit']['result'])
+                time.sleep(arguments.sleep * 2)
+            except mwc.wiki.requests.HTTPError:
+                print('Throttled, removed from cache, sleeping 30s')
+                del cache[upload.title]
+                time.sleep(30)
     except tinify.AccountError as exc:
         print('AccountError:', exc)
     finally:
@@ -1063,9 +1083,9 @@ if runme('cn'):
                         else:
                             print(" {{inaccurate}} already on page")
                         print("Page", page, "was not edited.") #log not editing
-                    time.sleep(5) #sleep 5 to avoid throttling
-            except mwc.wiki.requests.ConnectionError: #if we were throttled anyway
-                print('Throttled, sleeping for 30 seconds...') #log that
+                    time.sleep(arguments.sleep * 5) #sleep 5 to avoid throttling
+            except (mwc.wiki.requests.ConnectionError, mwc.wiki.requests.HTTPError): #if we were throttled anyway
+                print('Throttled, removed from cache, sleeping 30s') #log that
                 if page in cache:
                     cache.remove(page)
                 time.sleep(30) #sleep half a minute
