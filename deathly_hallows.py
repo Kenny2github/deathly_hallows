@@ -957,6 +957,7 @@ if limit:
                     continue
                 if 'known' in info:
                     print('', upload.title, 'is actually not on this wiki, skipping')
+                    continue
                 info = info['imageinfo'][0]
                 if 'compress' in info['comment'].casefold():
                     print(' Comment ({})'.format(info['comment']),
