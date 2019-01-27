@@ -557,6 +557,7 @@ def submitedit(pageobj_, contents_, summ):
 
 
 if runme('depersonifying', True, True):
+    print(' DEPERSONIFYING '.center(40, '='))
     limit = arguments.limit or int(input(
         'Press Enter to skip de-personifying, or a number'
         ' (then Enter) to do it on that amount of pages: '
@@ -611,6 +612,7 @@ if runme('depersonifying', True, True):
 
 
 if runme('references', True, True):
+    print(' REFERENCES '.center(40, '='))
     limit = arguments.limit or int(input(
         'Press Enter to skip reference updating,'
         ' or a number (then Enter) to do it on that amount of pages: '
@@ -688,6 +690,7 @@ The process is:
     return date
 
 if runme('dates'):
+    print(' DATES '.center(40, '='))
     cms = (sw.category(CONFIG['arbit']['datepcat']).categorymembers()
            if not arguments.page
            else (sw.page(i) for i in arguments.page))
@@ -722,6 +725,7 @@ if runme('dates'):
 #raise SystemExit #uncomment this to stop here
 
 if runme('extlinks', False, True):
+    print(' EXTLINK '.center(40, '='))
     limit = arguments.limit or int(input(
         'Enter a number of pages to check for external links,'
         ' or hit Enter to skip: '
@@ -809,6 +813,7 @@ elif runme('style'): # even if no stdin, this has work to do
 else: # no run because of --only
     limit = 0
 if limit:
+    print(' STYLE '.center(40, '='))
     print(' Requesting random pages...')
     pages = (sw.random(limit=limit, namespace=0)
              if not arguments.page
@@ -915,6 +920,7 @@ elif runme('compress'):
 else:
     limit = 0
 if limit:
+    print(' COMPRESS '.center(40, '='))
     if not arguments.nocache:
         try:
             with open('compressioncache.pickle', 'rb') as cache:
@@ -923,6 +929,7 @@ if limit:
             cache = {}
     else:
         cache = {}
+    notifications = {}
     try:
         logs = (sw.logevents(limit, letype='upload')
                 if not arguments.page
@@ -977,15 +984,14 @@ if limit:
                 print('Upload:', sw.upload(
                     fobj, upload.title, 'Automated upload: Compressed', True
                 )['upload']['result'])
-                talkpage = sw.page('User talk:' + info['user'])
-                if '{{nobots}}' in talkpage.read().lower():
-                    print('{{NoBots}} in talk page, notification skipped')
+                if info['user'] in notifications:
+                    notifications[info['user']].append(
+                        '[[:{}]]'.format(upload.title)
+                    )
                 else:
-                    print('Notification:', sw.page('User talk:' + info['user']).edit(
-                        CONFIG['compressmsg'].format(upload.title),
-                        'Automated edit: Notified user', section='new',
-                        sectiontitle=CONFIG['compresstitle']
-                    )['edit']['result'])
+                    notifications[info['user']] = ['[[:{}]]'.format(
+                        upload.title
+                    )]
                 time.sleep(arguments.sleep * 2)
             except mwc.wiki.requests.HTTPError:
                 print('Throttled, removed from cache, sleeping 30s')
@@ -996,6 +1002,21 @@ if limit:
     finally:
         with open('compressioncache.pickle', 'wb') as cach:
             pickle.dump(cache, cach, -1)
+        for name, files in notifications.items():
+            talkpage = sw.page('User talk:' + info['user'])
+            if '{{nobots}}' in talkpage.read().lower():
+                print('{{NoBots}} in talk page, notification skipped')
+            else:
+                print('Notification:', sw.page('User talk:' + name).edit(
+                    CONFIG['compressmsg'].format(
+                        ' and '.join(files)
+                        if len(files) < 3
+                        else (', '.join(files[:-1]) + ', and ' + files[-1])
+                    ),
+                    'Automated edit: Notified user', section='new',
+                    sectiontitle=CONFIG['compresstitle']
+                )['edit']['result'])
+            time.sleep(arguments.sleep * 2)
 
 #raise SystemExit #uncomment this to stop here
 
@@ -1015,6 +1036,7 @@ if limit:
 
 
 if runme('cn'):
+    print(' CN '.center(40, '='))
     if not arguments.nocache:
         try:
             with open('inaccuratecache.pickle', 'rb') as cache:
