@@ -121,6 +121,14 @@ else:
         print(' Loaded config: everything')
 print('Loaded config.')
 
+def lower(s):
+    """Lowercase the first letter of the string."""
+    return s[0].lower() + s[1:]
+
+def upper(s):
+    """Uppercase the first letter of the string."""
+    return s[0].upper() + s[1:]
+
 class StyleGuide(object): #pylint: disable=too-many-public-methods
     """Style guide rules"""
     #pylint: disable=missing-docstring
@@ -192,6 +200,22 @@ class StyleGuide(object): #pylint: disable=too-many-public-methods
         return parsed
 
     @staticmethod
+    def no_double_links(parsed):
+        for link in parsed.ifilter_wikilinks():
+            if lower(str(link.text)).startswith(lower(str(link.title))):
+                return False
+        return True
+
+    @staticmethod
+    def fix_no_double_links(parsed):
+        for link in parsed.ifilter_wikilinks():
+            if lower(str(link.text)).startswith(lower(str(link.title))):
+                parsed.replace(link, '[[{}]]{}'.format(
+                    link.title, link.text[len(str(link.title)):]
+                ))
+        return parsed
+
+    @staticmethod
     def no_section_underscores(parsed):
         for link in parsed.ifilter_wikilinks():
             if '#' not in link.title:
@@ -248,14 +272,14 @@ class StyleGuide(object): #pylint: disable=too-many-public-methods
         return True
 
     @staticmethod
-    def no_capitalized_templates(parsed):
+    def no_template_caps(parsed):
         for template in parsed.ifilter_templates():
             if re.match('^[A-Z][^A-Z]+$', str(template.name)):
                 return False
         return True
 
     @staticmethod
-    def fix_no_capitalized_templates(parsed):
+    def fix_no_template_caps(parsed):
         for template in parsed.ifilter_templates():
             if re.match('^[A-Z][^A-Z]+$', str(template.name)):
                 template.name = template.name[0].lower() + template.name[1:]
@@ -300,33 +324,13 @@ class StyleGuide(object): #pylint: disable=too-many-public-methods
         return parsed
 
     @staticmethod
-    def no_redirect_underscores(parsed):
-        if not parsed.upper().startswith('#REDIRECT'):
-            return True #it's not a redirect, it passes the test
-        return StyleGuide.no_link_underscores(parsed)
-
-    @staticmethod
-    def fix_no_redirect_underscores(parsed):
-        return StyleGuide.fix_no_link_underscores(parsed)
-
-    @staticmethod
-    def redirect_category_newline(parsed):
+    def redirect_cat_lf(parsed):
         if not parsed.upper().startswith('#REDIRECT'):
             return True #it's not a redirect, it passes the test
         links = parsed.filter_wikilinks()
         if not parsed.get(parsed.index(links[1]) - 1).endswith('\n'):
             return False
         return True
-
-    @staticmethod
-    def no_redir_section_underscores(parsed):
-        if not parsed.upper().startswith('#REDIRECT'):
-            return True #it's not a redirect, it passes the test
-        return StyleGuide.no_section_underscores(parsed)
-
-    @staticmethod
-    def fix_no_redir_section_underscores(parsed):
-        return StyleGuide.fix_no_section_underscores(parsed)
 
     @staticmethod
     def whitespace_headings(parsed):
