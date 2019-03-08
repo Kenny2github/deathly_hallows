@@ -834,7 +834,7 @@ if limit:
                 break
         go_on = True
         for warntemplate in parsed_content.ifilter_templates():
-            if warntemplate.name.lower() in (
+            if warntemplate.name.lower().strip() in (
                     [CONFIG['arbit']['bad'].lower()] + CONFIG['styletemps']
             ):
                 go_on = False
