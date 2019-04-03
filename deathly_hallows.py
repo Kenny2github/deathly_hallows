@@ -714,7 +714,7 @@ if runme('dates'):
         #add dates! :)
         go_on = False
         for datedtemplate in parsed_content.ifilter_templates():
-            if re.search(CONFIG['templates'], str(datedtemplate.name), re.I) \
+            if re.search(CONFIG['templates'], str(datedtemplate.name).strip(), re.I) \
                     and not datedtemplate.has('date'):
                 datedtemplate.add('date', get_date(page, datedtemplate.name))
                 go_on = True #at least one template was changed
@@ -729,61 +729,65 @@ if runme('dates'):
 #raise SystemExit #uncomment this to stop here
 
 if runme('extlinks', False, True):
-    print(' EXTLINK '.center(40, '='))
     limit = arguments.limit or int(input(
         'Enter a number of pages to check for external links,'
         ' or hit Enter to skip: '
     ) or '0')
-    if limit: #if limit != 0
-        templates = [CONFIG['arbit']['extlinks']]
-        for page in sw.template(templates[0]).redirects():
-            templates.append(page.title[9:])
-        pages = [] #no pages yet
-        print(' Requesting random pages...')
-        pages = (sw.random(limit=limit, namespace=0)
-                 if not arguments.page
-                 else (sw.page(i) for i in arguments.page))
-        print(' Requested random pages.')
-        for page in pages: #for every page
-            print('Page {}'.format(page.title))
-            content = page.read()
-            parsed = mwp.parse(content)
-            exttemp = None
-            for template in parsed.ifilter_templates():
-                name = str(template.name)
-                name = name[0].upper() + name[1:]
-                if re.fullmatch('([Tt]emplate:)?({})'
-                                .format('|'.join(templates)),
-                                name):
-                    exttemp = template
-                    break
-            extlinkq = False
-            for link in parsed.ifilter_external_links():
-                parsed_url = urlparse(str(link.url))
-                if not re.search(r'(?:.*\.)?(?:' + CONFIG['localdomains'] + ')$',
-                                 parsed_url.netloc, re.I):
-                    extlinkq = True
-                    break
-            summary = 'Automated edit: '
-            if exttemp is None and extlinkq:
-                content = '{{{{{}}}}}\n'.format(CONFIG['arbit']['extlinks']) + content
-                summary += 'Added {{{{[[Template:{0}|{0}]]}}}}'.format(
-                    CONFIG['arbit']['extlinks']
-                )
-            elif exttemp and not extlinkq:
-                parsed.remove(exttemp)
-                content = str(parsed).strip()
-                summary += 'Removed {{{{[[Template:{0}|{0}]]}}}}'.format(
-                    CONFIG['arbit']['extlinks']
-                )
-            else:
-                print('Not edited.')
-                time.sleep(arguments.sleep)
-                continue
-            print('Edit: {}'.format(submitedit(page, content, summary)))
+elif arguments.limit: #-AA but limit specified
+    limit = arguments.limit
+else:
+    limit = 0
+if limit: #if limit != 0
+    print(' EXTLINK '.center(40, '='))
+    templates = [CONFIG['arbit']['extlinks']]
+    for page in sw.template(templates[0]).redirects():
+        templates.append(page.title[9:])
+    pages = [] #no pages yet
+    print(' Requesting random pages...')
+    pages = (sw.random(limit=limit, namespace=0)
+             if not arguments.page
+             else (sw.page(i) for i in arguments.page))
+    print(' Requested random pages.')
+    for page in pages: #for every page
+        print('Page {}'.format(page.title))
+        content = page.read()
+        parsed = mwp.parse(content)
+        exttemp = None
+        for template in parsed.ifilter_templates():
+            name = str(template.name)
+            name = name[0].upper() + name[1:]
+            if re.fullmatch('([Tt]emplate:)?({})'
+                            .format('|'.join(templates)),
+                            name):
+                exttemp = template
+                break
+        extlinkq = False
+        for link in parsed.ifilter_external_links():
+            parsed_url = urlparse(str(link.url))
+            if not re.search(r'(?:.*\.)?(?:' + CONFIG['localdomains'] + ')$',
+                             parsed_url.netloc, re.I):
+                extlinkq = True
+                break
+        summary = 'Automated edit: '
+        if exttemp is None and extlinkq:
+            content = '{{{{{}}}}}\n'.format(CONFIG['arbit']['extlinks']) + content
+            summary += 'Added {{{{[[Template:{0}|{0}]]}}}}'.format(
+                CONFIG['arbit']['extlinks']
+            )
+        elif exttemp and not extlinkq:
+            parsed.remove(exttemp)
+            content = str(parsed).strip()
+            summary += 'Removed {{{{[[Template:{0}|{0}]]}}}}'.format(
+                CONFIG['arbit']['extlinks']
+            )
+        else:
+            print('Not edited.')
             time.sleep(arguments.sleep)
-    else:
-        del limit
+            continue
+        print('Edit: {}'.format(submitedit(page, content, summary)))
+        time.sleep(arguments.sleep)
+else:
+    del limit
 
 # This section is the {{bad style}} adding section.
 # It asks for user input as to how many pages to check style for,
