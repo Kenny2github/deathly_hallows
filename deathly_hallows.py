@@ -37,12 +37,16 @@ argparser.add_argument('--nocache', action='store_true',
                        help='do not use caches')
 argparser.add_argument('--only', metavar='process', nargs='*',
                        help='only run these processes')
+argparser.add_argument('--disable', metavar='process', nargs='*',
+                       help='do not run these processes')
 argparser.add_argument('--page', nargs='*',
                        help='only run processes on these pages')
 argparser.add_argument('--sleep', metavar='seconds', nargs='?', type=int,
                        help='how many seconds to wait between requests')
 argparser.add_argument('--limit', metavar='limit', nargs='?', type=int,
                        help='how many pages to request in all cases')
+argparser.add_argument('--user-agent', dest='agent', nargs='?',
+                       help='user agent to use (to maybe avoid 403s)')
 arguments = argparser.parse_args()
 if not arguments.fully or arguments.fully < 2:
     import easygui as e
@@ -56,7 +60,9 @@ with open('login.txt') as info: #open login info
     tinify.key = info.readline().strip()
 
 print('Loaded login data.')
-sw = mwc.Wiki(API, 'Python/3.6.3, deathly_hallows/2.0') #init the wiki
+sw = mwc.Wiki(API,
+              arguments.agent
+              or 'Python/3.7.0, deathly_hallows/2.4') #init the wiki
 #get configuration
 print('Loading config...')
 CONFIG = {}
@@ -508,12 +514,18 @@ class StyleGuide(object): #pylint: disable=too-many-public-methods
 
 def runme(name, semiauto=False, stdin=False):
     """Check if this section should run."""
-    if arguments.fully and arguments.fully > 1 and (stdin or semiauto):
-        return False
-    if arguments.fully and semiauto:
-        return False
+    if arguments.semi:
+        if not semiauto:
+            return False
+    if arguments.fully:
+        if arguments.fully > 1 and (stdin or semiauto):
+            return False
+        if stdin:
+            return False
     if not arguments.only:
-        return True
+        if not arguments.disable:
+            return True
+        return name not in arguments.disable
     return name in arguments.only
 
 if not arguments.sleep:
@@ -728,13 +740,11 @@ if runme('dates'):
 
 #raise SystemExit #uncomment this to stop here
 
-if runme('extlinks', False, True):
-    limit = arguments.limit or int(input(
+if runme('extlinks', False, False):
+    limit = arguments.limit or (int(input(
         'Enter a number of pages to check for external links,'
         ' or hit Enter to skip: '
-    ) or '0')
-elif arguments.limit: #-AA but limit specified
-    limit = arguments.limit
+    ) or '0') if (arguments.fully or 0) < 2 else 0)
 else:
     limit = 0
 if limit: #if limit != 0
@@ -812,13 +822,11 @@ else:
 #     4. submits the edit.
 
 
-if runme('style', False, True):
-    limit = arguments.limit or int(input(
+if runme('style', False, False):
+    limit = arguments.limit or (int(input(
         'Enter a number of pages to check for bad style (default 10): '
-    ) or '10')
-elif runme('style'): # even if no stdin, this has work to do
-    limit = arguments.limit or 10
-else: # no run because of --only
+    ) or '10') if (arguments.fully or 0) < 2 else 10)
+else:
     limit = 0
 if limit:
     print(' STYLE '.center(40, '='))
@@ -919,12 +927,10 @@ if limit:
 #     3. If the size difference is less than 1KB, skip it (not worth uploading)
 #     4. Upload the compressed file as a new version
 
-if runme('compress', False, True):
-    limit = arguments.limit or int(input(
+if runme('compress', False, False):
+    limit = arguments.limit or (int(input(
         'Enter a number of files to compress (default 10): '
-    ) or '10')
-elif runme('compress'):
-    limit = arguments.limit or 10
+    ) or '10') if (arguments.fully or 0) < 2 else 10)
 else:
     limit = 0
 if limit:
@@ -984,22 +990,32 @@ if limit:
                 source = tinify.from_url(uploadurl) #pylint: disable=no-member
                 buff = source.to_buffer()
                 size2 = len(buff)
-                if (size - size2) < 1000:
-                    print(' Size difference less than 1K:', size - size2)
+                if ((size - size2) / size) < 0.1:
+                    print(' Size difference less than 10%: {:.0f}%'.format((size - size2) / size * 100))
                     continue
                 fobj = io.BytesIO(buff)
                 print(' Compressed, uploading')
                 print('Upload:', sw.upload(
                     fobj, upload.title, 'Automated upload: Compressed', True
                 )['upload']['result'])
-                if info['user'] in notifications:
-                    notifications[info['user']].append(
-                        '[[:{}]]'.format(upload.title)
-                    )
+                if re.match(
+                        'Reverted to version as of [0-9]{1,2}:[0-9]{2}, '
+                        r'[0-9]{1,2} \w+ [0-9]{4} \([A-Z]+\)',
+                        info['comment'],
+                        re.I
+                ):
+                    print(' Comment ({})'.format(info['comment']),
+                          'indicates upload was probably a revert,',
+                          'skipping notification for this upload')
                 else:
-                    notifications[info['user']] = ['[[:{}]]'.format(
-                        upload.title
-                    )]
+                    if info['user'] in notifications:
+                        notifications[info['user']].append(
+                            '[[:{}]]'.format(upload.title)
+                        )
+                    else:
+                        notifications[info['user']] = ['[[:{}]]'.format(
+                            upload.title
+                        )]
                 time.sleep(arguments.sleep * 2)
             except mwc.wiki.requests.HTTPError:
                 print('Throttled, removed from cache, sleeping 30s')
