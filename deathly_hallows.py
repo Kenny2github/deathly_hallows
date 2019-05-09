@@ -1055,7 +1055,7 @@ if limit:
         with open('compressioncache.pickle', 'wb') as cach:
             pickle.dump(cache, cach, -1)
         for name, files in notifications.items():
-            talkpage = sw.page('User talk:' + info['user'])
+            talkpage = sw.page('User talk:' + name)
             if '{{nobots}}' in talkpage.read().lower():
                 print('{{NoBots}} in talk page, notification skipped')
             else:
