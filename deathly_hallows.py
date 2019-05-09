@@ -510,6 +510,34 @@ class StyleGuide(object): #pylint: disable=too-many-public-methods
                 parsed.replace(link, rep)
                 continue
         return parsed
+
+    _yt_regex = re.compile(
+        r'https?://(?:(?:www\.)?youtu\.?be(?:\.com)?/(?:watch\?.*v=)?'
+        r'|scratch\.mit\.edu/discuss/youtube/)'
+        r'([a-zA-Z0-9_-]{11})/?.*',
+        re.I
+    )
+
+    @classmethod
+    def internal_youtube_links(cls, parsed):
+        for link in parsed.ifilter_external_links():
+            if re.search(cls._yt_regex, str(link.url)):
+                return False
+        return True
+
+    @classmethod
+    def fix_internal_youtube_links(cls, parsed):
+        for link in parsed.ifilter_external_links():
+            url = str(link.url)
+            m = re.search(cls._yt_regex, str(link.url))
+            if m:
+                code = m.group(1)
+                if link.title:
+                    rep = '[[yt:{}|{}]]'.format(code, link.title)
+                else:
+                    rep = '[[yt:{}]]'.format(code)
+                parsed.replace(link, rep)
+        return parsed
     #pylint: enable=missing-docstring
 
 def runme(name, semiauto=False, stdin=False):
@@ -538,7 +566,7 @@ print('Login result:', loginresult['status'])
 
 def submitedit(pageobj_, contents_, summ):
     """Submit edit function"""
-    if arguments.confirmedit and arguments.fully < 2:
+    if arguments.confirmedit and (arguments.fully or 0) < 2:
         confirm = e.codebox(f'Confirm edit on {pageobj_.title}',
                             'Confirm Edit', contents_)
         if confirm is None or not confirm.strip():
@@ -748,7 +776,7 @@ if runme('extlinks', False, False):
 else:
     limit = 0
 if limit: #if limit != 0
-    print(' EXTLINK '.center(40, '='))
+    print(' EXTLINKS '.center(40, '='))
     templates = [CONFIG['arbit']['extlinks']]
     for page in sw.template(templates[0]).redirects():
         templates.append(page.title[9:])
