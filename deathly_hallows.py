@@ -47,6 +47,9 @@ argparser.add_argument('--limit', metavar='limit', nargs='?', type=int,
                        help='how many pages to request in all cases')
 argparser.add_argument('--user-agent', dest='agent', nargs='?',
                        help='user agent to use (to maybe avoid 403s)')
+argparser.add_argument('--recent-not-random', action='store_true',
+                       help='for processes that use random pages, use pages in '
+                       'recent changes instead.')
 arguments = argparser.parse_args()
 if not arguments.fully or arguments.fully < 2:
     import easygui as e
@@ -556,6 +559,15 @@ def runme(name, semiauto=False, stdin=False):
         return name not in arguments.disable
     return name in arguments.only
 
+def rcorrandom(limit):
+    if arguments.page:
+        return map(sw.page, arguments.page)
+    if arguments.recent_not_random:
+        return (sw.page(i.title)
+                for i in sw.recentchanges(rctoponly=True, rcnamespace=0,
+                                          limit=limit))
+    return sw.random(limit=limit, namespace=0)
+
 if not arguments.sleep:
     arguments.sleep = 1
 
@@ -609,9 +621,7 @@ if runme('depersonifying', True, True):
     if limit: #if limit != 0
         pages = [] #no pages yet
         print(' Requesting random pages...')
-        pages = (sw.random(limit=limit, namespace=0)
-                 if not arguments.page
-                 else (sw.page(i) for i in arguments.page))
+        pages = rcorrandom(limit)
         print(' Requested random pages.')
         for page in pages: #for every page
             content = page.read()
@@ -664,9 +674,7 @@ if runme('references', True, True):
     if limit: #if limit != 0
         pages = [] #no pages yet
         print(' Requesting random pages...')
-        pages = (sw.random(limit=limit, namespace=0)
-                 if not arguments.page
-                 else (sw.page(i) for i in arguments.page))
+        pages = rcorrandom(limit)
         print(' Requested random pages.')
         for page in pages: #for every page
             content = page.read()
@@ -782,9 +790,7 @@ if limit: #if limit != 0
         templates.append(page.title[9:])
     pages = [] #no pages yet
     print(' Requesting random pages...')
-    pages = (sw.random(limit=limit, namespace=0)
-             if not arguments.page
-             else (sw.page(i) for i in arguments.page))
+    pages = rcorrandom(limit)
     print(' Requested random pages.')
     for page in pages: #for every page
         print('Page {}'.format(page.title))
@@ -859,9 +865,7 @@ else:
 if limit:
     print(' STYLE '.center(40, '='))
     print(' Requesting random pages...')
-    pages = (sw.random(limit=limit, namespace=0)
-             if not arguments.page
-             else (sw.page(i) for i in arguments.page))
+    pages = rcorrandom(limit)
     print(' Requested random pages.')
     for page in pages:
         print('Page', page.title)
