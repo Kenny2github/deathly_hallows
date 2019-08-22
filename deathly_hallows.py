@@ -33,8 +33,8 @@ argparser.add_argument('--no-style-fix', action='store_true',
                        help='do not fix style guidelines, only report them')
 argparser.add_argument('--no-style-template', action='store_true',
                        help='do not report style guidelines, only fix them')
-argparser.add_argument('--nocache', action='store_true',
-                       help='do not use caches')
+argparser.add_argument('--reset-cache', action='store_true',
+                       help='reset caches', dest='nocache')
 argparser.add_argument('--only', metavar='process', nargs='*',
                        help='only run these processes')
 argparser.add_argument('--disable', metavar='process', nargs='*',
@@ -50,7 +50,36 @@ argparser.add_argument('--user-agent', dest='agent', nargs='?',
 argparser.add_argument('--recent-not-random', action='store_true',
                        help='for processes that use random pages, use pages in '
                        'recent changes instead.')
+argparser.add_argument('--delete-compress-cache', nargs='?', default=None,
+                       help='File:Image.png to delete from compression cache')
+argparser.add_argument('--delete-inaccurate-cache', nargs='?', default=None,
+                       help='Title to delete from citation cache')
 arguments = argparser.parse_args()
+
+if arguments.delete_compress_cache:
+    with open('compressioncache.pickle', 'rb') as f:
+        cache = pickle.load(f)
+    print('Loaded compression cache')
+    cache.pop(arguments.delete_compress_cache, None)
+    print('Popped', arguments.delete_compress_cache)
+    with open('compressioncache.pickle', 'wb') as f:
+        pickle.dump(cache, f, -1)
+    print('Saved compression cache')
+    raise SystemExit
+
+if arguments.delete_inaccurate_cache:
+    with open('inaccuratecache.pickle', 'rb') as f:
+        cache = pickle.load(f)
+    print('Loaded inaccurate cache')
+    if isinstance(cache, list):
+        cache = set(cache)
+        print('Converted cache to set')
+    cache.discard(arguments.delete_inaccurate_cache)
+    print('Discarded', arguments.delete_inaccurate_cache)
+    with open('inaccuratecache.pickle', 'wb') as f:
+        pickle.dump(cache, f, -1)
+    raise SystemExit
+
 if not arguments.fully or arguments.fully < 2:
     import easygui as e
 
@@ -260,6 +289,8 @@ class StyleGuide(object): #pylint: disable=too-many-public-methods
 
     @staticmethod
     def cat_at_end(parsed):
+        if str(parsed).strip().casefold().startswith('#redirect'):
+            return True
         parsed = StyleGuide._remove_ignore(parsed)
         links = parsed.filter_wikilinks()
         links = list(l for l in links
@@ -337,6 +368,8 @@ class StyleGuide(object): #pylint: disable=too-many-public-methods
         if not parsed.upper().startswith('#REDIRECT'):
             return True #it's not a redirect, it passes the test
         links = parsed.filter_wikilinks()
+        if len(links) < 2:
+            return True #no cat, passes the test
         if not parsed.get(parsed.index(links[1]) - 1).endswith('\n'):
             return False
         return True
@@ -1053,6 +1086,9 @@ if limit:
                 print('Throttled, removed from cache, sleeping 30s')
                 del cache[upload.title]
                 time.sleep(30)
+            except mwc.WikiError.protectedpage:
+                print('Protected, removed from cache')
+                del cache[upload.title]
     except tinify.AccountError as exc:
         print('AccountError:', exc)
     finally:
@@ -1063,7 +1099,8 @@ if limit:
             if '{{nobots}}' in talkpage.read().lower():
                 print('{{NoBots}} in talk page, notification skipped')
             else:
-                print('Notification:', sw.page('User talk:' + name).edit(
+                print('Notifying', name + ':', sw.page('User talk:'
+                                                       + name).edit(
                     CONFIG['compressmsg'].format(
                         ' and '.join(files)
                         if len(files) < 3
