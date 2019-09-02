@@ -598,7 +598,7 @@ def rcorrandom(limit):
     if arguments.recent_not_random:
         return (sw.page(i.title)
                 for i in sw.recentchanges(rctoponly=True, rcnamespace=0,
-                                          limit=limit))
+                                          limit=limit, rcshow='!bot'))
     return sw.random(limit=limit, namespace=0)
 
 if not arguments.sleep:
