@@ -176,6 +176,8 @@ class StyleGuide(object): #pylint: disable=too-many-public-methods
         for tag in parsed.ifilter_tags():
             if tag.tag in CONFIG['styletags']:
                 parsed.remove(tag)
+        if parsed.contains('#REDIRECT'):
+            parsed.remove('#REDIRECT')
         return parsed
 
     @staticmethod
