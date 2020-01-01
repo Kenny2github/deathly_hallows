@@ -462,11 +462,6 @@ class StyleGuide(object): #pylint: disable=too-many-public-methods
         return True
 
     @staticmethod
-    def no_hr_whitespace(parsed):
-        parsed = StyleGuide._remove_ignore(parsed)
-        return '\n\n----\n\n' not in str(parsed)
-
-    @staticmethod
     def no_trailing_spaces(parsed):
         return not bool(re.search('[ \t](\n|$)', str(parsed)))
 
