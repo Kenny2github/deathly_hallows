@@ -56,6 +56,7 @@ argparser.add_argument('--delete-inaccurate-cache', nargs='?', default=None,
                        help='Title to delete from citation cache')
 arguments = argparser.parse_args()
 
+exit_early = False
 if arguments.delete_compress_cache:
     with open('compressioncache.pickle', 'rb') as f:
         cache = pickle.load(f)
@@ -65,7 +66,7 @@ if arguments.delete_compress_cache:
     with open('compressioncache.pickle', 'wb') as f:
         pickle.dump(cache, f, -1)
     print('Saved compression cache')
-    raise SystemExit
+    exit_early = True
 
 if arguments.delete_inaccurate_cache:
     with open('inaccuratecache.pickle', 'rb') as f:
@@ -78,6 +79,9 @@ if arguments.delete_inaccurate_cache:
     print('Discarded', arguments.delete_inaccurate_cache)
     with open('inaccuratecache.pickle', 'wb') as f:
         pickle.dump(cache, f, -1)
+    exit_early = True
+
+if exit_early:
     raise SystemExit
 
 if not arguments.fully or arguments.fully < 2:
@@ -177,7 +181,7 @@ class StyleGuide(object): #pylint: disable=too-many-public-methods
             if tag.tag in CONFIG['styletags']:
                 parsed.remove(tag)
         if parsed.contains('#REDIRECT'):
-            parsed.remove('#REDIRECT')
+            parsed.remove(parsed) # blank it, not to be checked
         return parsed
 
     @staticmethod
