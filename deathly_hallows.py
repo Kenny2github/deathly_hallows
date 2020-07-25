@@ -83,6 +83,8 @@ if arguments.delete_inaccurate_cache:
 
 if exit_early:
     raise SystemExit
+print('Running with arguments:')
+print(arguments)
 
 if not arguments.fully or arguments.fully < 2:
     import easygui as e
@@ -548,6 +550,40 @@ class StyleGuide(object): #pylint: disable=too-many-public-methods
                 continue
         return parsed
 
+    @staticmethod
+    def internal_scratch_links(parsed):
+        for link in parsed.ifilter_external_links():
+            if re.search(
+                    # discuss/ is already handled above
+                    r'^https?://scratch\.mit\.edu/(?!discuss)([^/]*).*',
+                    str(link.url)
+            ):
+                return False
+        return True
+
+    @staticmethod
+    def fix_internal_scratch_links(parsed):
+        for link in parsed.ifilter_external_links():
+            m = re.search(
+                r'^https?://scratch\.mit\.edu/((?!discuss)([^/]*)/?(.*))',
+                str(link.url)
+            )
+            if m is None:
+                continue
+            if m.group(2) in {'users', 'studios', 'projects'}:
+                prefix = m.group(2)
+            else:
+                prefix = 'scratch'
+            title = m.group(1 if prefix == 'scratch' else 3).rstrip('/')
+            text = link.title
+            if text:
+                text = '|' + str(text)
+            else:
+                text = ''
+            newlink = f'[[{prefix}:{title}{text}]]'
+            parsed.replace(link, newlink)
+        return parsed
+
     _yt_regex = re.compile(
         r'https?://(?:(?:www\.)?youtu\.?be(?:\.com)?/(?:watch\?.*v=)?'
         r'|scratch\.mit\.edu/discuss/youtube/)'
@@ -944,7 +980,7 @@ if limit:
                          + '\n|date={{subst:CURRENTMONTHNAME}} {{subst:CURRENTYEAR}}\n}}\n'
                 wikilinks = parsed_content.filter_wikilinks()
                 wikilinks = list(filter(
-                    lambda link: re.match(r'(Category|[a-z][a-z]([a-z]|-[a-z]+)?):.*',
+                    lambda link: re.match(r'(Category|(?!ar-[a-z]+)[a-z][a-z]([a-z]|-[a-z]+)?):.*',
                                           str(link.title), re.I), wikilinks
                 ))
                 try:
@@ -1029,7 +1065,7 @@ if limit:
                 if upload.user in bots:
                     print('Log ID', upload.logid, 'was done by bot, skipping')
                     continue
-                if not upload.title.casefold().endswith(('.png', '.jpg')):
+                if not upload.title.casefold().endswith(('.png', '.jpg', '.jpeg')):
                     print(upload.title, 'is not JPG or PNG, skipping')
                     continue
                 print(upload.title)
@@ -1098,7 +1134,7 @@ if limit:
         for name, files in notifications.items():
             talkpage = sw.page('User talk:' + name)
             if '{{nobots}}' in talkpage.read().lower():
-                print('{{NoBots}} in talk page, notification skipped')
+                print('{{NoBots}} in talk page, notification skipped for', name)
             else:
                 print('Notifying', name + ':', sw.page('User talk:'
                                                        + name).edit(
