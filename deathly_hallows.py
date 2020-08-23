@@ -199,7 +199,8 @@ class StyleGuide(object): #pylint: disable=too-many-public-methods
     @staticmethod
     def no_link_underscores(parsed):
         for link in parsed.ifilter_wikilinks():
-            if '_' in link.title:
+            title = str(link.title).casefold()
+            if '_' in title and not title.startswith('users:'):
                 return False
         return True
 
