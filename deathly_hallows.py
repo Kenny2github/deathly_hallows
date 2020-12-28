@@ -1229,7 +1229,7 @@ if runme('cn'):
                                   '{{subst:CURRENTYEAR}}}}\n' + content
                         summary = 'Automated edit: added {{inaccurate}} (' \
                                   + str(detected) + ' {{citation needed}}s)'
-                        print('', detected, '{{citation neeeded}}s') #log how many cns
+                        print('', detected, '{{citation needed}}s') #log how many cns
                         go_on = True
                     if go_on: #if something happened
                         print("Edit on page", page + ":", submitedit(pageobj, content, summary))
