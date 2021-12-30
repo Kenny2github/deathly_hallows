@@ -182,7 +182,7 @@ class StyleGuide(object): #pylint: disable=too-many-public-methods
         for tag in parsed.ifilter_tags():
             if tag.tag in CONFIG['styletags']:
                 parsed.remove(tag)
-        if parsed.contains('#REDIRECT'):
+        if parsed.upper().lstrip().startswith('#REDIRECT'):
             parsed.remove(parsed) # blank it, not to be checked
         return parsed
 
@@ -384,6 +384,17 @@ class StyleGuide(object): #pylint: disable=too-many-public-methods
         if not parsed.get(parsed.index(links[1]) - 1).endswith('\n'):
             return False
         return True
+
+    @staticmethod
+    def redirect_caps(parsed):
+        if not parsed.upper().startswith('#REDIRECT'):
+            return True #it's not a redirect, it passes the test
+        return parsed.startswith('#REDIRECT') #case sensitive
+
+    @staticmethod
+    def fix_redirect_caps(parsed):
+        parsed.replace(parsed[:len('#REDIRECT')], '#REDIRECT')
+        return parsed
 
     @staticmethod
     def whitespace_headings(parsed):
