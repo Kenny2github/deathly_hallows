@@ -1060,6 +1060,7 @@ if limit:
     else:
         cache = {}
     notifications = {}
+    protected = set()
     try:
         logs = (sw.logevents(limit, letype='upload')
                 if not arguments.page
@@ -1138,11 +1139,15 @@ if limit:
                 del cache[upload.title]
                 time.sleep(30)
             except mwc.WikiError.protectedpage:
-                print('Protected, removed from cache')
-                del cache[upload.title]
+                print('', upload.title, 'is protected, skipping')
+                protected.add(upload.title)
     except tinify.AccountError as exc:
         print('AccountError:', exc)
     finally:
+        if protected:
+            for title in protected:
+                print('Removing protected', title, 'from cache')
+                del cache[upload.title]
         with open('compressioncache.pickle', 'wb') as cach:
             pickle.dump(cache, cach, -1)
         for name, files in notifications.items():
