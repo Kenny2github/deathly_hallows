@@ -1,3 +1,4 @@
+#!/usr/bin/python3.7
 """It's a bot."""
 #Low-level imports
 import os
