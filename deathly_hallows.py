@@ -568,12 +568,17 @@ class StyleGuide(object): #pylint: disable=too-many-public-methods
     @staticmethod
     def internal_scratch_links(parsed):
         for link in parsed.ifilter_external_links():
-            if re.search(
-                    # discuss/ is already handled above
-                    r'^https?://scratch\.mit\.edu/(?!discuss)([^/]*).*',
-                    str(link.url)
-            ):
-                return False
+            match = re.search(
+                # discuss/ is already handled above
+                r'^https?://scratch\.mit\.edu/(?!discuss)([^/]*)/?(.*)',
+                str(link.url)
+            )
+            if not match:
+                continue # no match entirely
+            target = match.group(2).split('/', 1)[0]
+            if '__' in target or target.startswith('_') or target.endswith('_'):
+                continue # cannot make MW link to x__y or _x or x_
+            return False # fixable link
         return True
 
     @staticmethod
@@ -590,6 +595,8 @@ class StyleGuide(object): #pylint: disable=too-many-public-methods
             else:
                 prefix = 'scratch'
             title = m.group(1 if prefix == 'scratch' else 3).rstrip('/')
+            if '__' in title or title.startswith('_') or title.endswith('_'):
+                continue # cannot make MW link to x__y or _x or x_
             text = link.title
             if text:
                 text = '|' + str(text)
