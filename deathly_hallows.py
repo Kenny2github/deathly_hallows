@@ -87,7 +87,7 @@ if exit_early:
 print('Running with arguments:')
 print(arguments)
 
-if not arguments.fully or arguments.fully < 2:
+if not arguments.fully or arguments.fully < 2 or arguments.confirmedit:
     import easygui as e
 
 #setup
@@ -670,7 +670,7 @@ print('Login result:', loginresult['status'])
 
 def submitedit(pageobj_, contents_, summ):
     """Submit edit function"""
-    if arguments.confirmedit and (arguments.fully or 0) < 2:
+    if arguments.confirmedit:
         confirm = e.codebox(f'Confirm edit on {pageobj_.title}',
                             'Confirm Edit', contents_)
         if confirm is None or not confirm.strip():
