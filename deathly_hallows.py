@@ -261,7 +261,8 @@ class StyleGuide(object): #pylint: disable=too-many-public-methods
         for link in parsed.ifilter_wikilinks():
             if lower(str(link.text)).startswith(lower(str(link.title))):
                 parsed.replace(link, '[[{}]]{}'.format(
-                    link.text, link.text[len(str(link.title)):]
+                    link.text[:len(str(link.title))],
+                    link.text[len(str(link.title)):]
                 ))
         return parsed
 
