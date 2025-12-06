@@ -689,6 +689,8 @@ def submitedit(pageobj_, contents_, summ):
         if done:
             return 'Success'
         return f'Failed ({exc})'
+    finally:
+        print(repr(sw._session.cookies))
 
 # This section is the de-1st/2nd-personifying section.
 # It asks for user input as to how many pages to depersonify,
