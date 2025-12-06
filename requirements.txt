@@ -1,3 +1,4 @@
 mw-api-client
 mwparserfromhell
 easygui
+tinify
